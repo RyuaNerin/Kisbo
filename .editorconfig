@@ -1,0 +1,22 @@
+; Top-most http://editorconfig.org/ file
+root = true
+
+[*]
+end_of_line = crlf
+charset = utf-8
+insert_final_newline = true
+
+; 4-column tab indentation
+[*.cs]
+indent_style = space
+indent_size = 4
+
+; 4-column tab indentation
+[*.xaml]
+indent_style = space
+indent_size = 4
+
+; 4-column tab indentation
+[*.xml]
+indent_style = space
+indent_size = 4
