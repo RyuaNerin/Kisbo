@@ -1,0 +1,44 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.40629.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Files", "Solution Files", "{5D009336-F6E4-46A8-80A4-1C89AB908F4F}"
+	ProjectSection(SolutionItems) = preProject
+		LICENSE.txt = LICENSE.txt
+		README.md = README.md
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kisbo", "Kisbo\Kisbo.csproj", "{2A2B9228-764C-4B44-8203-99DE98550B49}"
+	ProjectSection(ProjectDependencies) = postProject
+		{742FE632-177C-4CC9-A21B-4A04D4806862} = {742FE632-177C-4CC9-A21B-4A04D4806862}
+		{FBD3817A-E704-4FC6-901C-D6E4FAC787EE} = {FBD3817A-E704-4FC6-901C-D6E4FAC787EE}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KisboExt32", "KisboExt\KisboExt32.vcxproj", "{FBD3817A-E704-4FC6-901C-D6E4FAC787EE}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KisboExt64", "KisboExt\KisboExt64.vcxproj", "{742FE632-177C-4CC9-A21B-4A04D4806862}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2A2B9228-764C-4B44-8203-99DE98550B49}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2A2B9228-764C-4B44-8203-99DE98550B49}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2A2B9228-764C-4B44-8203-99DE98550B49}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2A2B9228-764C-4B44-8203-99DE98550B49}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FBD3817A-E704-4FC6-901C-D6E4FAC787EE}.Debug|Any CPU.ActiveCfg = Debug|Win32
+		{FBD3817A-E704-4FC6-901C-D6E4FAC787EE}.Debug|Any CPU.Build.0 = Debug|Win32
+		{FBD3817A-E704-4FC6-901C-D6E4FAC787EE}.Release|Any CPU.ActiveCfg = Release|Win32
+		{FBD3817A-E704-4FC6-901C-D6E4FAC787EE}.Release|Any CPU.Build.0 = Release|Win32
+		{742FE632-177C-4CC9-A21B-4A04D4806862}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{742FE632-177C-4CC9-A21B-4A04D4806862}.Debug|Any CPU.Build.0 = Debug|x64
+		{742FE632-177C-4CC9-A21B-4A04D4806862}.Release|Any CPU.ActiveCfg = Release|x64
+		{742FE632-177C-4CC9-A21B-4A04D4806862}.Release|Any CPU.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
