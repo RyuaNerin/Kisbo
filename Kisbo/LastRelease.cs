@@ -24,9 +24,6 @@ namespace Kisbo
             [DataMember(Name = "html_url")]
             public string HtmlUrl { get; set; }
 
-            [DataMember(Name = "published_at")]
-            public DateTime PublishedAt { get; set; }
-
             [DataMember(Name = "assets")]
             public Asset[] Assets { get; set; }
 
