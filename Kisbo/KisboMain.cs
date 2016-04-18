@@ -99,9 +99,9 @@ namespace Kisbo
             {
                 if (instance.IsInstance)
                 {
-                    var frm = new SearchWindow();
-                    frm.FormClosing += (s, e) => instance.Release();
+                    Application.ApplicationExit += (s, e) => instance.Release();
                     
+                    var frm = new SearchWindow();
                     instance.DataReceived += (e) => frm.AddFile(e);
                     instance.Ready();
 

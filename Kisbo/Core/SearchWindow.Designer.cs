@@ -58,8 +58,11 @@
             this.ctlOpenDir = new System.Windows.Forms.FolderBrowserDialog();
             this.ctlProgress = new System.Windows.Forms.Label();
             this.ctlNotify = new System.Windows.Forms.NotifyIcon(this.components);
+            this.ctlNofityMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
+            this.ctlExit = new System.Windows.Forms.ToolStripMenuItem();
             this.ctlListMenu.SuspendLayout();
             this.ctlMenu.SuspendLayout();
+            this.ctlNofityMenu.SuspendLayout();
             this.SuspendLayout();
             // 
             // ctlList
@@ -111,21 +114,20 @@
             this.ctlOpenDirectory,
             this.ctlOpenGoogleResult});
             this.ctlListMenu.Name = "ctlListMenu";
-            this.ctlListMenu.ShowImageMargin = false;
-            this.ctlListMenu.Size = new System.Drawing.Size(166, 48);
+            this.ctlListMenu.Size = new System.Drawing.Size(191, 48);
             this.ctlListMenu.Opening += new System.ComponentModel.CancelEventHandler(this.ctlListMenu_Opening);
             // 
             // ctlOpenDirectory
             // 
             this.ctlOpenDirectory.Name = "ctlOpenDirectory";
-            this.ctlOpenDirectory.Size = new System.Drawing.Size(165, 22);
+            this.ctlOpenDirectory.Size = new System.Drawing.Size(190, 22);
             this.ctlOpenDirectory.Text = "폴더 열기";
             this.ctlOpenDirectory.Click += new System.EventHandler(this.openDirectoryToolStripMenuItem_Click);
             // 
             // ctlOpenGoogleResult
             // 
             this.ctlOpenGoogleResult.Name = "ctlOpenGoogleResult";
-            this.ctlOpenGoogleResult.Size = new System.Drawing.Size(165, 22);
+            this.ctlOpenGoogleResult.Size = new System.Drawing.Size(190, 22);
             this.ctlOpenGoogleResult.Text = "이미지 검색결과 열기";
             this.ctlOpenGoogleResult.Click += new System.EventHandler(this.openGoogleResultToolStripMenuItem_Click);
             // 
@@ -137,6 +139,8 @@
             this.ctlListState.Images.SetKeyName(1, "");
             this.ctlListState.Images.SetKeyName(2, "");
             this.ctlListState.Images.SetKeyName(3, "");
+            this.ctlListState.Images.SetKeyName(4, "");
+            this.ctlListState.Images.SetKeyName(5, "");
             // 
             // ctlOpenFile
             // 
@@ -299,8 +303,23 @@
             // 
             // ctlNotify
             // 
+            this.ctlNotify.ContextMenuStrip = this.ctlNofityMenu;
             this.ctlNotify.Visible = true;
-            this.ctlNotify.Click += new System.EventHandler(this.ctlNotify_Click);
+            this.ctlNotify.MouseClick += new System.Windows.Forms.MouseEventHandler(this.ctlNotify_MouseClick);
+            // 
+            // ctlNofityMenu
+            // 
+            this.ctlNofityMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.ctlExit});
+            this.ctlNofityMenu.Name = "ctlNofityMenu";
+            this.ctlNofityMenu.Size = new System.Drawing.Size(99, 26);
+            // 
+            // ctlExit
+            // 
+            this.ctlExit.Name = "ctlExit";
+            this.ctlExit.Size = new System.Drawing.Size(98, 22);
+            this.ctlExit.Text = "종료";
+            this.ctlExit.Click += new System.EventHandler(this.ctlExit_Click);
             // 
             // SearchWindow
             // 
@@ -317,12 +336,13 @@
             this.Name = "SearchWindow";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Kisbo";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.SearchWindow_FormClosing);
             this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.SearchWindow_FormClosed);
             this.Shown += new System.EventHandler(this.SearchWindow_Shown);
-            this.Resize += new System.EventHandler(this.SearchWindow_Resize);
             this.ctlListMenu.ResumeLayout(false);
             this.ctlMenu.ResumeLayout(false);
             this.ctlMenu.PerformLayout();
+            this.ctlNofityMenu.ResumeLayout(false);
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -358,6 +378,8 @@
         private System.Windows.Forms.ToolStripMenuItem ctlTopMost;
         private System.Windows.Forms.ToolStripSeparator ctlSep1;
         private System.Windows.Forms.NotifyIcon ctlNotify;
+        private System.Windows.Forms.ContextMenuStrip ctlNofityMenu;
+        private System.Windows.Forms.ToolStripMenuItem ctlExit;
 
     }
 }

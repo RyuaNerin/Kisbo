@@ -74,8 +74,7 @@ namespace Kisbo.Core
                             if (find >= 0)
                             {
                                 var item = this.m_files[find];
-                                if (item.State == States.Complete ||
-                                    item.State == States.Error)
+                                if (item.Worked)
                                     item.Remove();
                             }
 
@@ -98,6 +97,7 @@ namespace Kisbo.Core
 
         private void SearchWindow_FormClosed(object sender, FormClosedEventArgs e)
         {
+            this.ctlNotify.Visible = false;
             this.Hide();
             this.m_cancel.Cancel(true);
             Task.WaitAll(this.m_workers);
@@ -149,8 +149,7 @@ namespace Kisbo.Core
                     count = this.m_working.Count;
 
                     for (int i = 0; i < this.m_working.Count; ++i)
-                        if (this.m_working[i].State == States.Complete ||
-                            this.m_working[i].State == States.Error)
+                        if (this.m_working[i].Worked)
                             ++complete;
                 }
 
@@ -207,7 +206,8 @@ namespace Kisbo.Core
 
             KisboFile file;
             int i;
-            bool working;
+            bool complete;
+            States result;
 
             using (var wc = new WebClientx(token))
             using (var buff = new MemoryStream(3 * 1024 * 1024))
@@ -223,11 +223,13 @@ namespace Kisbo.Core
                         lock (this.m_files)
                         {
                             file = null;
-                            working = true;
+                            complete = this.m_working.Count > 0;
                             for (i = 0; i < this.m_working.Count; ++i)
                             {
-                                if (working && (this.m_working[i].State == States.Complete || this.m_working[i].State == States.Error))
-                                    working = false;
+                                if (token.IsCancellationRequested) return;
+
+                                if (!this.m_working[i].Worked)
+                                    complete = false;
 
                                 if (this.m_working[i].State == States.Wait)
                                 {
@@ -236,26 +238,29 @@ namespace Kisbo.Core
                                     break;
                                 }
                             }
+
+                            if (complete)
+                            {
+                                this.m_working.Clear();
+
+                                this.Invoke(new Action<int, string, string, ToolTipIcon>(this.ctlNotify.ShowBalloonTip), 5000, this.Text, "작업을 끝냈어요!!", ToolTipIcon.Info);
+                            }
                         }
+                        if (token.IsCancellationRequested) return;
 
                         if (file != null)
                         {
-                            if (SearchImage(wc, file, writer, token))
-                                this.Invoke(new Action<States>(file.SetState), States.Complete);
-                            else
-                                this.Invoke(new Action<States>(file.SetState), States.Error);
+                            result = SearchImage(wc, file, writer, token);
+
+                            if (token.IsCancellationRequested) return;
+
+                            this.Invoke(new Action<States>(file.SetState), result);
 
                             this.SetProgress();
                         }
                         else
                         {
-                            if (working)
-                            {
-                                lock (this.m_files)
-                                {
-                                    this.m_working.Clear();
-                                }
-                            }
+                            if (token.IsCancellationRequested) return;
 
                             Thread.Sleep(50);
                         }
@@ -268,7 +273,7 @@ namespace Kisbo.Core
         }
         
         private static Regex regSimilar = new Regex("<a href=\"([^\"]+)\">", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private bool SearchImage(WebClientx wc, KisboFile file, StreamWriter writer, CancellationToken token)
+        private States SearchImage(WebClientx wc, KisboFile file, StreamWriter writer, CancellationToken token)
         {
             string body;
 
@@ -281,7 +286,7 @@ namespace Kisbo.Core
             }
             catch
             {
-                return false;
+                return States.Error;
             }
 
             try
@@ -318,105 +323,105 @@ namespace Kisbo.Core
                     writer.BaseStream.Position = 0;
 
                     if (!wc.UploadData(new Uri(this.m_googleUri, "/searchbyimage/upload"), writer.BaseStream, "multipart/form-data; boundary=" + origBoundary))
-                        return false;
+                        return States.Error;
                 }
 
                 var searchResultUri = new Uri(this.m_googleUri, wc.Location);
                 file.GoogleUrl = searchResultUri.AbsoluteUri;
 
                 if ((body = wc.DownloadString(searchResultUri)) == null)
-                    return false;
+                    return States.Error;
 
                 int startIndex = body.IndexOf("<div class=\"card-section\">", StringComparison.OrdinalIgnoreCase);
                 int endIndex   = body.IndexOf("<hr class=\"rgsep _l4\">", startIndex, StringComparison.OrdinalIgnoreCase);
 
                 var m = regSimilar.Match(body, startIndex, endIndex - startIndex);
 
-                if (m.Success)
+                if (!m.Success)
+                    return States.NoResult;
+
+                if ((body = wc.DownloadString(new Uri(this.m_googleUri, m.Groups[1].Value.Replace("&amp;", "&")))) == null)
+                    return States.Error;
+
+                string part, newExtension = null, newPath, tempPath = null, dir;
+                Guid guid;
+                RGMeta rgMeta;
+
+                startIndex = 0;
+                while ((startIndex = body.IndexOf("<div class=\"rg_meta\">", startIndex, StringComparison.OrdinalIgnoreCase)) >= 0)
                 {
-                    if ((body = wc.DownloadString(new Uri(this.m_googleUri, m.Groups[1].Value.Replace("&amp;", "&")))) == null)
-                        return false;
+                    if (file.Removed) break;
+                    if (token.IsCancellationRequested) return States.Error;
 
-                    string part, newExtension = null, newPath, tempPath = null, dir;
-                    Guid guid;
-                    RGMeta rgMeta;
+                    startIndex = body.IndexOf("{", startIndex + 1, StringComparison.OrdinalIgnoreCase);
+                    endIndex = body.IndexOf("</div>", startIndex, StringComparison.OrdinalIgnoreCase);
+                    part = body.Substring(startIndex, endIndex - startIndex);
 
-                    startIndex = 0;
-                    while ((startIndex = body.IndexOf("<div class=\"rg_meta\">", startIndex, StringComparison.OrdinalIgnoreCase)) >= 0)
+                    startIndex = endIndex + 1;
+
+                    try
                     {
-                        if (file.Removed) break;
-                        if (token.IsCancellationRequested) return false;
+                        rgMeta = RGMeta.Parse(part);
+                        if (rgMeta.Width  <= oldSize.Width ||
+                            rgMeta.Height <= oldSize.Height)
+                            continue;
 
-                        startIndex = body.IndexOf("{", startIndex + 1, StringComparison.OrdinalIgnoreCase);
-                        endIndex = body.IndexOf("</div>", startIndex, StringComparison.OrdinalIgnoreCase);
-                        part = body.Substring(startIndex, endIndex - startIndex);
-
-                        startIndex = endIndex + 1;
-
-                        try
-                        {
-                            rgMeta = RGMeta.Parse(part);
-                            if (rgMeta.Width  <= oldSize.Width ||
-                                rgMeta.Height <= oldSize.Height)
+                        tempPath = Path.GetTempFileName();
+                        using (var fileStream = File.OpenWrite(tempPath))
+                            if (!BypassHttp.GetResponse(rgMeta.ImageUrl, fileStream, token))
                                 continue;
 
-                            tempPath = Path.GetTempFileName();
-                            using (var fileStream = File.OpenWrite(tempPath))
-                                if (!BypassHttp.GetResponse(rgMeta.ImageUrl, fileStream, token))
-                                    continue;
+                        if (file.Removed) break;
+                        using (var img = Image.FromFile(tempPath))
+                        {
+                            guid = img.RawFormat.Guid;
 
-                            if (file.Removed) break;
-                            using (var img = Image.FromFile(tempPath))
-                            {
-                                guid = img.RawFormat.Guid;
+                                 if (guid == ImageFormat.Bmp.Guid)  newExtension = ".bmp";
+                            else if (guid == ImageFormat.Gif.Guid)  newExtension = ".gif";
+                            else if (guid == ImageFormat.Jpeg.Guid) newExtension = ".jpg";
+                            else if (guid == ImageFormat.Png.Guid)  newExtension = ".png";
 
-                                     if (guid == ImageFormat.Bmp .Guid) newExtension = ".bmp";
-                                else if (guid == ImageFormat.Gif .Guid) newExtension = ".gif";
-                                else if (guid == ImageFormat.Jpeg.Guid) newExtension = ".jpg";
-                                else if (guid == ImageFormat.Png .Guid) newExtension = ".png";
+                            if (img.Width  <= oldSize.Width ||
+                                img.Height <= oldSize.Height)
+                                continue;
 
-                                if (img.Width  <= oldSize.Width ||
-                                    img.Height <= oldSize.Height)
-                                    continue;
+                            this.Invoke(new Action<Size>(file.SetAfterResolution), oldSize = img.Size);
+                        }
 
-                                this.Invoke(new Action<Size>(file.SetAfterResolution), oldSize = img.Size);
-                            }
+                        if (file.Removed) break;
 
-                            if (file.Removed) break;
+                        dir = Path.Combine(Path.GetDirectoryName(file.FilePath), "kisbo-original");
+                        if (!Directory.Exists(dir))
+                            Directory.CreateDirectory(dir);
 
-                            dir = Path.Combine(Path.GetDirectoryName(file.FilePath), "kisbo-original");
-                            if (!Directory.Exists(dir))
-                                Directory.CreateDirectory(dir);
+                        File.Move(file.FilePath, Path.Combine(dir, Path.GetFileName(file.FilePath)));
 
-                            File.Move(file.FilePath, Path.Combine(dir, Path.GetFileName(file.FilePath)));
+                        newPath = Path.ChangeExtension(file.FilePath, newExtension);
+                        File.Move(tempPath, GetSafeFileName(newPath, ""));
 
-                            newPath = Path.ChangeExtension(file.FilePath, newExtension);
-                            File.Move(tempPath, GetSafeFileName(newPath, ""));
-                            
-                            return true;
+                        return States.Complete;
+                    }
+                    catch
+                    {
+                    }
+                    finally
+                    {
+                        try
+                        {
+                            File.Delete(tempPath);
                         }
                         catch
                         {
                         }
-                        finally
-                        {
-                            try
-                            {
-                                File.Delete(tempPath);
-                            }
-                            catch
-                            {
-                            }
-                        }
                     }
                 }
+
+                return States.Pass;
             }
             catch
             {
-                return false;
+                return States.Error;
             }
-
-            return false;
         }
 
         private static string GetSafeFileName(string path, string part)
@@ -735,17 +740,31 @@ namespace Kisbo.Core
         #endregion
 
         #region Tray
-        private void SearchWindow_Resize(object sender, EventArgs e)
+        private void SearchWindow_FormClosing(object sender, FormClosingEventArgs e)
         {
-            if (this.WindowState == FormWindowState.Minimized)
+            if (e.CloseReason == CloseReason.UserClosing)
+            {
                 this.Hide();
+                this.ctlNotify.ShowBalloonTip(5000, this.Text, "트레이에서 여전히 실행중!!", ToolTipIcon.Info);
+                e.Cancel = true;
+            }
         }
-        private void ctlNotify_Click(object sender, EventArgs e)
+
+        private void ctlNotify_MouseClick(object sender, MouseEventArgs e)
         {
-            this.Show();
-            this.WindowState = FormWindowState.Normal;
-            this.Focus();
+            if (e.Button == MouseButtons.Left)
+            {
+                this.Show();
+                this.WindowState = FormWindowState.Normal;
+                this.Focus();
+            }
+        }
+
+        private void ctlExit_Click(object sender, EventArgs e)
+        {
+            Application.Exit();
         }
         #endregion
+
     }
 }

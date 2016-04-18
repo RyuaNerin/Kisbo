@@ -10,6 +10,7 @@ namespace Kisbo
         {
             AppDomain.CurrentDomain.UnhandledException += (s, e) => ShowCrashReport((Exception)e.ExceptionObject);
             System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (s, e) => ShowCrashReport(e.Exception);
+            Application.ThreadException += (s, e) => ShowCrashReport(e.Exception);
         }
 
         private static void ShowCrashReport(Exception exception)
@@ -19,7 +20,7 @@ namespace Kisbo
 
             using (var writer = new StreamWriter(Path.Combine(Path.GetDirectoryName(Application.ExecutablePath), file)))
             {
-                writer.WriteLine("Decchi Crash Report");
+                writer.WriteLine("Crash Report");
                 writer.WriteLine("Date    : " + date);
                 writer.WriteLine("Version : " + Application.ProductVersion);
                 writer.WriteLine();

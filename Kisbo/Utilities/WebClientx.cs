@@ -22,7 +22,7 @@ namespace Kisbo.Utilities
             GC.SuppressFinalize(this);
         }
 
-        //private static readonly CookieContainer CookieContainer = new CookieContainer();
+        private static readonly CookieContainer CookieContainer = new CookieContainer();
         private readonly CancellationToken m_token;
 
         private readonly MemoryStream m_buffer;
@@ -49,7 +49,7 @@ namespace Kisbo.Utilities
 
             var req = WebRequest.Create(uri) as HttpWebRequest;
             req.AllowAutoRedirect = false;
-            //req.CookieContainer = CookieContainer;
+            req.CookieContainer = CookieContainer;
             req.UserAgent = UserAgent;
             req.AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip;
 

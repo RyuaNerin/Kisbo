@@ -9,7 +9,9 @@ namespace Kisbo.Core
         Wait = 0,
         Working = 1,
         Complete = 2,
-        Error = 3
+        Pass = 3,
+        NoResult = 4,
+        Error = 5,
     }
 
     internal class KisboFile
@@ -60,11 +62,12 @@ namespace Kisbo.Core
         public string GoogleUrl;
 
         public States State;
+        public bool Worked { get { return this.State != States.Wait && this.State != States.Working; } }
 
         public void SetState(States value)
         {
-            this.ListViewItem.StateImageIndex = (int)value;
             this.State = value;
+            this.ListViewItem.StateImageIndex = (int)value;
         }
         public void SetBeforeResolution(Size value)
         {
