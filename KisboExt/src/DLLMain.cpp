@@ -112,13 +112,18 @@ STDAPI DllRegisterServer(void)
     if (!Regist_CLSID(clsid))
         return SELFREG_E_CLASS;
 
-    if (!Regist_Key(HKEY_CLASSES_ROOT, L"*\\ShellEx\\ContextMenuHandlers\\KisboExt", NULL, clsid))
+    // 0.0.0.1 old
+    RegDeleteKeyW(HKEY_CLASSES_ROOT, L"*\\ShellEx\\ContextMenuHandlers\\KisboExt");
+    RegDeleteKeyW(HKEY_CLASSES_ROOT, L"Directory\\ShellEx\\ContextMenuHandlers\\KisboExt");
+
+    // 0.0.0.2 new
+    if (!Regist_Key(HKEY_CLASSES_ROOT, L"*\\ShellEx\\ContextMenuHandlers\\00KisboExt", NULL, clsid))
         return SELFREG_E_CLASS;
 
-    if (!Regist_Key(HKEY_CLASSES_ROOT, L"Directory\\ShellEx\\ContextMenuHandlers\\KisboExt", NULL, clsid))
+    if (!Regist_Key(HKEY_CLASSES_ROOT, L"Directory\\ShellEx\\ContextMenuHandlers\\00KisboExt", NULL, clsid))
         return SELFREG_E_CLASS;
 
-    if (!Regist_Key(HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\Windows\\CurrentVersion\\Shell Extensions\\Approved", NULL, L"KisboExt"))
+    if (!Regist_Key(HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\Windows\\CurrentVersion\\Shell Extensions\\Approved", NULL, L"00KisboExt"))
         return SELFREG_E_CLASS;
 
     return S_OK;
@@ -142,10 +147,14 @@ STDAPI DllUnregisterServer(void)
     StringFromGUID2(SHELLEXT_GUID, clsid, ARRAYSIZE(clsid));
     
     Unregist_CLSID(clsid);
-    
-    RegDeleteKeyW(HKEY_CLASSES_ROOT, L"*\\ShellEx\\ContextMenuHandlers\\KisboExt");
 
+    // 0.0.0.1 old
+    RegDeleteKeyW(HKEY_CLASSES_ROOT, L"*\\ShellEx\\ContextMenuHandlers\\KisboExt");
     RegDeleteKeyW(HKEY_CLASSES_ROOT, L"Directory\\ShellEx\\ContextMenuHandlers\\KisboExt");
+
+    // 0.0.0.2 new
+    RegDeleteKeyW(HKEY_CLASSES_ROOT, L"*\\ShellEx\\ContextMenuHandlers\\00KisboExt");
+    RegDeleteKeyW(HKEY_CLASSES_ROOT, L"Directory\\ShellEx\\ContextMenuHandlers\\00KisboExt");
 
     HKEY hTmpKey;
     if (RegOpenKeyW(HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\Windows\\CurrentVersion\\Shell Extensions\\Approved", &hTmpKey) == ERROR_SUCCESS)

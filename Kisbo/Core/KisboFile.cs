@@ -33,24 +33,18 @@ namespace Kisbo.Core
         {
             var kisboFile = new KisboFile(form, filePath);
 
-            lock (form.m_files)
-            {
-                form.ctlList.Items.Add(kisboFile.ListViewItem);
-                form.m_files.Add(kisboFile);
-                form.m_working.Add(kisboFile);
-            }
+            form.ctlList.Items.Add(kisboFile.ListViewItem);
+            form.m_files.Add(kisboFile);
+            form.m_working.Add(kisboFile);
         }
 
         public void Remove()
         {
             this.Removed = true;
 
-            lock (this.m_form.m_files)
-            {
-                this.m_form.m_files.Remove(this);
-                this.m_form.m_working.Remove(this);
-                this.m_form.ctlList.Items.RemoveAt(this.ListViewItem.Index);
-            }
+            this.m_form.m_files.Remove(this);
+            this.m_form.m_working.Remove(this);
+            this.m_form.ctlList.Items.RemoveAt(this.ListViewItem.Index);
         }
 
         private readonly SearchWindow m_form;
