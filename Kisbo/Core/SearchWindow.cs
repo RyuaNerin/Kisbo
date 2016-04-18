@@ -742,8 +742,8 @@ namespace Kisbo.Core
         }
         private void ctlNotify_Click(object sender, EventArgs e)
         {
-            this.WindowState = FormWindowState.Normal;
             this.Show();
+            this.WindowState = FormWindowState.Normal;
             this.Focus();
         }
         #endregion
