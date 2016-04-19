@@ -25,6 +25,8 @@ namespace Kisbo.Utilities
             var req = WebRequest.Create(uri) as HttpWebRequest;
             req.Referer = new Uri(uri, "/").AbsoluteUri;
             req.UserAgent = UserAgent;
+            req.Timeout = 2000;
+            req.ReadWriteTimeout = 2000;
 
             lock (CookieContainer)
                 req.Headers.Set("cookie", CookieContainer.GetCookieHeader(uri));
@@ -81,9 +83,9 @@ namespace Kisbo.Utilities
             using (var http = res.GetResponseStream())
             {
                 int rd;
-                var buff = new byte[40960]; // 40k
+                var buff = new byte[65536]; // 64k
 
-                while (!token.IsCancellationRequested && (rd = http.Read(buff, 0, 40960)) > 0)
+                while (!token.IsCancellationRequested && (rd = http.Read(buff, 0, 65536)) > 0)
                     stream.Write(buff, 0, rd);
             }
 

@@ -17,6 +17,8 @@ namespace Kisbo.Core
 {
     internal partial class SearchWindow : Form
     {
+        private const int Workers = 4;
+
         public SearchWindow()
         {
             InitializeComponent();
@@ -35,17 +37,25 @@ namespace Kisbo.Core
         }
 
         private readonly Taskbar m_taskbar;
-        private readonly ManualResetEvent m_isWorking = new ManualResetEvent(true);
+        private readonly ManualResetEvent m_pauseHandler = new ManualResetEvent(true);
+        private readonly ManualResetEvent m_newItemHandler = new ManualResetEvent(false);
         private readonly CancellationTokenSource m_cancel = new CancellationTokenSource();
 
-        public readonly List<KisboFile> m_files = new List<KisboFile>();
-        public readonly List<KisboFile> m_working = new List<KisboFile>();
-        private Task[] m_workers = new Task[4];
+        public readonly object m_lock = new object();
+        public readonly List<KisboFile> m_list = new List<KisboFile>();
+
+        private Task[] m_workers = new Task[Workers];
         private Uri m_googleUri = new Uri("https://google.com/");
+
+        public long m_taskbarVal = 0;
+        public long m_taskbarMax = 0; 
         
         public void AddFile(byte[] data)
         {
-            this.AddFile(Encoding.UTF8.GetString(data).Split('\n'));
+            if (data.Length == 1 && data[0] == 0xFE)
+                this.Invoke(new Action(this.Activate));
+            else
+                this.AddFile(Encoding.UTF8.GetString(data).Split('\n'));
         }
         public void AddFile(IEnumerable<string> data)
         {
@@ -55,43 +65,34 @@ namespace Kisbo.Core
             {
                 this.ctlList.BeginUpdate();
 
-                bool containsFile = false;
-
-                int find;
-                lock (m_files)
+                lock (this.m_lock)
                 {
+                    Debug.WriteLine("AddFile Lock");
+
                     var lst = new List<string>();
-                    int i;
 
                     foreach (var path in data)
                     {
-                        if (KisboMain.Check(path))
+                        if (KisboMain.Check(path) && !this.m_list.Exists(e => e.FilePath.Equals(path, StringComparison.OrdinalIgnoreCase)))
                         {
-                            containsFile = true;
-
-                            find = this.m_files.FindIndex(e => e.FilePath.Equals(path, StringComparison.OrdinalIgnoreCase));
-
-                            if (find >= 0)
-                            {
-                                var item = this.m_files[find];
-                                if (item.Worked)
-                                    item.Remove();
-                            }
-
                             lst.Add(path);
                         }
                     }
 
-                    for (i = 0; i < lst.Count; ++i)
+                    for (int i = 0; i < lst.Count; ++i)
                         KisboFile.Create(this, lst[i]);
+
+                    if (lst.Count > 0)
+                        this.m_newItemHandler.Set();
+
+                    Interlocked.Add(ref this.m_taskbarMax, lst.Count);
+
+                    Debug.WriteLine("AddFile Unlock");
                 }
 
                 this.ctlList.EndUpdate();
 
                 this.SetProgress();
-
-                if (!containsFile)
-                    this.Activate();
             }
         }
 
@@ -99,6 +100,9 @@ namespace Kisbo.Core
         {
             this.ctlNotify.Visible = false;
             this.Hide();
+            
+            this.m_newItemHandler.Set();
+            this.m_pauseHandler.Set();
             this.m_cancel.Cancel(true);
             Task.WaitAll(this.m_workers);
             Application.Exit();
@@ -118,14 +122,14 @@ namespace Kisbo.Core
         
         private void ctlPause_Click(object sender, EventArgs e)
         {
-            if (this.m_isWorking.WaitOne(0))
+            if (this.m_pauseHandler.WaitOne(0))
             {
-                this.m_isWorking.Reset();
+                this.m_pauseHandler.Reset();
                 this.ctlPause.Text = "재시작";
             }
             else
             {
-                this.m_isWorking.Set();
+                this.m_pauseHandler.Set();
                 this.ctlPause.Text = "일시정지";
             }
 
@@ -141,25 +145,16 @@ namespace Kisbo.Core
             }
             else
             {
-                int complete = 0;
-                int count;
+                var val = Interlocked.Read(ref this.m_taskbarVal);
+                var max = Interlocked.Read(ref this.m_taskbarMax);
 
-                lock (this.m_files)
+                this.ctlProgress.Text = string.Format("{0} / {1}", val, max);
+
+                if (val != max)
                 {
-                    count = this.m_working.Count;
+                    this.m_taskbar.SetProgressValue(val + 1, max + 1);
 
-                    for (int i = 0; i < this.m_working.Count; ++i)
-                        if (this.m_working[i].Worked)
-                            ++complete;
-                }
-
-                this.ctlProgress.Text = string.Format("{0} / {1}", complete, count);
-
-                if (complete != count)
-                {
-                    this.m_taskbar.SetProgressValue(complete + 1, count + 1);
-
-                    if (this.m_isWorking.WaitOne(0))
+                    if (this.m_pauseHandler.WaitOne(0))
                         this.m_taskbar.SetProgressState(TaskbarProgressBarState.Normal);
                     else
                         this.m_taskbar.SetProgressState(TaskbarProgressBarState.Paused);
@@ -194,15 +189,18 @@ namespace Kisbo.Core
             }
 
             // 4 Workers
-            (this.m_workers[0] = new Task(this.SearchWorker, this.m_cancel.Token, this.m_cancel.Token, TaskCreationOptions.LongRunning)).Start();
-            (this.m_workers[1] = new Task(this.SearchWorker, this.m_cancel.Token, this.m_cancel.Token, TaskCreationOptions.LongRunning)).Start();
-            (this.m_workers[2] = new Task(this.SearchWorker, this.m_cancel.Token, this.m_cancel.Token, TaskCreationOptions.LongRunning)).Start();
-            (this.m_workers[3] = new Task(this.SearchWorker, this.m_cancel.Token, this.m_cancel.Token, TaskCreationOptions.LongRunning)).Start();
+            for (int i = 0; i < Workers; ++i)
+                (this.m_workers[i] = new Task(this.SearchWorker, i, this.m_cancel.Token, TaskCreationOptions.LongRunning)).Start();
         }
 
-        private void SearchWorker(object oToken)
+        private void SearchWorker(object oIndex)
         {
-            var token = (CancellationToken)oToken;
+            var token = this.m_cancel.Token;
+            var index = (int)oIndex;
+
+#if DEBUG
+            Thread.CurrentThread.Name = "SearchWorker " + index;
+#endif
 
             KisboFile file;
             int i;
@@ -210,7 +208,7 @@ namespace Kisbo.Core
             States result;
 
             using (var wc = new WebClientx(token))
-            using (var buff = new MemoryStream(3 * 1024 * 1024))
+            using (var buff = new MemoryStream(1024 * 1024))
             {
                 var writer = new StreamWriter(buff, Encoding.UTF8) { AutoFlush = true, NewLine = "\r\n" };
 
@@ -218,49 +216,77 @@ namespace Kisbo.Core
                 {
                     while (!token.IsCancellationRequested)
                     {
-                        this.m_isWorking.WaitOne();
+                        this.m_pauseHandler.WaitOne();
+                        this.m_newItemHandler.WaitOne();
 
-                        lock (this.m_files)
+                        if (token.IsCancellationRequested) return;
+
+                        if (buff.Capacity > 2 * 1024 * 1024)
                         {
+                            buff.SetLength(0);
+                            buff.Capacity = 1024 * 1024;
+                        }
+
+                        lock (this.m_lock)
+                        {
+                            Debug.WriteLine("SearchWorker {0} Lock", index);
+
                             file = null;
-                            complete = this.m_working.Count > 0;
-                            for (i = 0; i < this.m_working.Count; ++i)
+                            complete = true;
+                            for (i = 0; i < this.m_list.Count; ++i)
                             {
                                 if (token.IsCancellationRequested) return;
 
-                                if (!this.m_working[i].Worked)
+                                if (!this.m_list[i].Worked)
                                     complete = false;
 
-                                if (this.m_working[i].State == States.Wait)
+                                if (this.m_list[i].State == States.Wait)
                                 {
-                                    file = this.m_working[i];
-                                    this.Invoke(new Action<States>(file.SetState), States.Working);
+                                    file = this.m_list[i];
+                                    file.State = States.Working;
                                     break;
                                 }
                             }
 
                             if (complete)
                             {
-                                this.m_working.Clear();
-
-                                this.Invoke(new Action<int, string, string, ToolTipIcon>(this.ctlNotify.ShowBalloonTip), 5000, this.Text, "작업을 끝냈어요!!", ToolTipIcon.Info);
+                                Interlocked.Exchange(ref this.m_taskbarVal, 0);
+                                Interlocked.Exchange(ref this.m_taskbarMax, 0);
+                                this.m_newItemHandler.Reset();
+                                
+                                for (i = 0; i < this.m_list.Count; ++i)
+                                    this.m_list[i].NotTodo = true;
                             }
+
+                            Debug.WriteLine("SearchWorker {0} Unlock", index);
                         }
+
+                        if (complete)
+                        {
+                            this.SetProgress();
+
+                            this.Invoke(new Action<int, string, string, ToolTipIcon>(this.ctlNotify.ShowBalloonTip), 5000, this.Text, "작업을 끝냈어요!!", ToolTipIcon.Info);
+                            continue;
+                        }
+
                         if (token.IsCancellationRequested) return;
 
                         if (file != null)
                         {
+                            file.SetStatus();
                             result = SearchImage(wc, file, writer, token);
 
                             if (token.IsCancellationRequested) return;
 
-                            this.Invoke(new Action<States>(file.SetState), result);
+                            file.State = result;
+                            file.SetStatus();
+
+                            Interlocked.Increment(ref this.m_taskbarVal);
 
                             this.SetProgress();
                         }
                         else
                         {
-                            if (token.IsCancellationRequested) return;
 
                             Thread.Sleep(50);
                         }
@@ -282,7 +308,7 @@ namespace Kisbo.Core
             try
             {
                 using (var img = Image.FromFile(file.FilePath))
-                    this.Invoke(new Action<Size>(file.SetBeforeResolution), oldSize = img.Size);
+                    file.SetBeforeResolution(oldSize = img.Size);
             }
             catch
             {
@@ -322,15 +348,11 @@ namespace Kisbo.Core
 
                     writer.BaseStream.Position = 0;
 
-                    if (!wc.UploadData(new Uri(this.m_googleUri, "/searchbyimage/upload"), writer.BaseStream, "multipart/form-data; boundary=" + origBoundary))
+                    if ((body = wc.UploadData(new Uri(this.m_googleUri, "/searchbyimage/upload"), writer.BaseStream, "multipart/form-data; boundary=" + origBoundary)) == null)
                         return States.Error;
                 }
 
-                var searchResultUri = new Uri(this.m_googleUri, wc.Location);
-                file.GoogleUrl = searchResultUri.AbsoluteUri;
-
-                if ((body = wc.DownloadString(searchResultUri)) == null)
-                    return States.Error;
+                file.GoogleUrl = wc.LastUrl.AbsoluteUri;
 
                 int startIndex = body.IndexOf("<div class=\"card-section\">", StringComparison.OrdinalIgnoreCase);
                 int endIndex   = body.IndexOf("<hr class=\"rgsep _l4\">", startIndex, StringComparison.OrdinalIgnoreCase);
@@ -351,6 +373,7 @@ namespace Kisbo.Core
                 while ((startIndex = body.IndexOf("<div class=\"rg_meta\">", startIndex, StringComparison.OrdinalIgnoreCase)) >= 0)
                 {
                     if (file.Removed) break;
+
                     if (token.IsCancellationRequested) return States.Error;
 
                     startIndex = body.IndexOf("{", startIndex + 1, StringComparison.OrdinalIgnoreCase);
@@ -367,6 +390,7 @@ namespace Kisbo.Core
                             continue;
 
                         tempPath = Path.GetTempFileName();
+
                         using (var fileStream = File.OpenWrite(tempPath))
                             if (!BypassHttp.GetResponse(rgMeta.ImageUrl, fileStream, token))
                                 continue;
@@ -385,7 +409,7 @@ namespace Kisbo.Core
                                 img.Height <= oldSize.Height)
                                 continue;
 
-                            this.Invoke(new Action<Size>(file.SetAfterResolution), oldSize = img.Size);
+                            file.SetAfterResolution(img.Size);
                         }
 
                         if (file.Removed) break;
@@ -446,57 +470,120 @@ namespace Kisbo.Core
         #region 메뉴
         private void ctlRemoveSelected_Click(object sender, EventArgs e)
         {
-            lock (this.m_files)
+            if (this.ctlList.SelectedItems.Count == 0) return;
+
+            lock (this.m_lock)
             {
+                Debug.WriteLine("ctlRemoveSelected_Click Lock");
                 int index = this.ctlList.SelectedItems[0].Index - 1;
+
+                this.ctlList.BeginUpdate();
 
                 while (this.ctlList.SelectedItems.Count > 0)
                     ((KisboFile)this.ctlList.SelectedItems[0].Tag).Remove();
 
+                this.ctlList.EndUpdate();
+
                 if (index < 0) index = 0;
-                if (index >= this.m_files.Count) index = this.m_files.Count - 1;
+                if (index >= this.m_list.Count) index = this.m_list.Count - 1;
 
                 if (index >= 0)
                     this.ctlList.Items[index].Selected = true;
+                Debug.WriteLine("ctlRemoveSelected_Click Unlock");
             }
         }
 
         private void ctlClearAll_Click(object sender, EventArgs e)
         {
-            lock (this.m_files)
+            lock (this.m_lock)
             {
-                while (this.m_files.Count > 0)
-                    this.m_files[0].Remove();
+                Debug.WriteLine("ctlClearAll_Click Lock");
 
-                this.SetProgress();
+                this.ctlList.BeginUpdate();
+
+                while (this.m_list.Count > 0)
+                    this.m_list[0].Remove();
+
+                this.ctlList.EndUpdate();
+
+                Debug.WriteLine("ctlClearAll_Click Unlock");
             }
+
+            this.SetProgress();
         }
 
         private void ctlRemoveCompleted_Click(object sender, EventArgs e)
         {
-            lock (this.m_files)
+            lock (this.m_lock)
             {
+                Debug.WriteLine("ctlRemoveCompleted_Click Lock");
+                
+                this.ctlList.BeginUpdate();
+
                 int i = 0;
-                while ( i < this.m_files.Count)
+                while (i < this.m_list.Count)
                 {
-                    if (this.m_files[i].State == States.Complete)
-                        this.m_files[i].Remove();
+                    if (this.m_list[i].Success)
+                        this.m_list[i].Remove();
                     else
                         ++i;
                 }
 
+                this.ctlList.EndUpdate();
+
                 this.SetProgress();
+
+                Debug.WriteLine("ctlRemoveCompleted_Click Unlock");
+            }
+        }
+
+        private void ctlRework_Click(object sender, EventArgs e)
+        {
+            lock (this.m_lock)
+            {
+                Debug.WriteLine("ctlRework_Click Lock");
+
+                KisboFile item;
+                for (int i = 0; i < this.ctlList.SelectedItems.Count; ++i)
+                {
+                    item = ((KisboFile)this.ctlList.SelectedItems[i].Tag);
+                    if (item.State == States.Error)
+                    {
+                        item.State = States.Wait;
+                        this.ctlList.SelectedItems[i].StateImageIndex = (int)States.Wait;
+
+                        Interlocked.Increment(ref this.m_taskbarMax);
+                    }
+                }
+
+                this.SetProgress();
+
+                Debug.WriteLine("ctlRework_Click Unlock");
             }
         }
         
         private void ctlListMenu_Opening(object sender, System.ComponentModel.CancelEventArgs e)
         {
             this.ctlOpenGoogleResult.Enabled = false;
+            this.ctlRework.Enabled = false;
+
+            KisboFile item;
             for (int i = 0; i < this.ctlList.SelectedItems.Count; ++i)
             {
-                if (((KisboFile)this.ctlList.SelectedItems[i].Tag).GoogleUrl != null)
+                item = ((KisboFile)this.ctlList.SelectedItems[i].Tag);
+                if (item.GoogleUrl != null)
                 {
                     this.ctlOpenGoogleResult.Enabled = true;
+                    break;
+                }
+            }
+
+            for (int i = 0; i < this.ctlList.SelectedItems.Count; ++i)
+            {
+                item = ((KisboFile)this.ctlList.SelectedItems[i].Tag);
+                if (item.State == States.Error)
+                {
+                    this.ctlRework.Enabled = true;
                     break;
                 }
             }

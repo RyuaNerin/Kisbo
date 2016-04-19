@@ -37,6 +37,8 @@
             this.ctlListMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.ctlOpenDirectory = new System.Windows.Forms.ToolStripMenuItem();
             this.ctlOpenGoogleResult = new System.Windows.Forms.ToolStripMenuItem();
+            this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
+            this.ctlRework = new System.Windows.Forms.ToolStripMenuItem();
             this.ctlListState = new System.Windows.Forms.ImageList(this.components);
             this.ctlOpenFile = new System.Windows.Forms.OpenFileDialog();
             this.ctlMenu = new System.Windows.Forms.MenuStrip();
@@ -112,9 +114,11 @@
             // 
             this.ctlListMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.ctlOpenDirectory,
-            this.ctlOpenGoogleResult});
+            this.ctlOpenGoogleResult,
+            this.toolStripSeparator1,
+            this.ctlRework});
             this.ctlListMenu.Name = "ctlListMenu";
-            this.ctlListMenu.Size = new System.Drawing.Size(191, 48);
+            this.ctlListMenu.Size = new System.Drawing.Size(191, 76);
             this.ctlListMenu.Opening += new System.ComponentModel.CancelEventHandler(this.ctlListMenu_Opening);
             // 
             // ctlOpenDirectory
@@ -130,6 +134,18 @@
             this.ctlOpenGoogleResult.Size = new System.Drawing.Size(190, 22);
             this.ctlOpenGoogleResult.Text = "이미지 검색결과 열기";
             this.ctlOpenGoogleResult.Click += new System.EventHandler(this.openGoogleResultToolStripMenuItem_Click);
+            // 
+            // toolStripSeparator1
+            // 
+            this.toolStripSeparator1.Name = "toolStripSeparator1";
+            this.toolStripSeparator1.Size = new System.Drawing.Size(187, 6);
+            // 
+            // ctlRework
+            // 
+            this.ctlRework.Name = "ctlRework";
+            this.ctlRework.Size = new System.Drawing.Size(190, 22);
+            this.ctlRework.Text = "재시도";
+            this.ctlRework.Click += new System.EventHandler(this.ctlRework_Click);
             // 
             // ctlListState
             // 
@@ -330,6 +346,7 @@
             this.Controls.Add(this.ctlCopyRight);
             this.Controls.Add(this.ctlList);
             this.Controls.Add(this.ctlMenu);
+            this.DoubleBuffered = true;
             this.Font = new System.Drawing.Font("Consolas", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.MainMenuStrip = this.ctlMenu;
             this.MinimumSize = new System.Drawing.Size(336, 291);
@@ -380,6 +397,8 @@
         private System.Windows.Forms.NotifyIcon ctlNotify;
         private System.Windows.Forms.ContextMenuStrip ctlNofityMenu;
         private System.Windows.Forms.ToolStripMenuItem ctlExit;
+        private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
+        private System.Windows.Forms.ToolStripMenuItem ctlRework;
 
     }
 }

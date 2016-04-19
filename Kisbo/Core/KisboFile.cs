@@ -1,6 +1,8 @@
-﻿using System.Drawing;
+﻿using System;
+using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
+using System.Threading;
 
 namespace Kisbo.Core
 {
@@ -19,8 +21,7 @@ namespace Kisbo.Core
         private KisboFile(SearchWindow form, string filePath)
         {
             this.m_form = form;
-
-            this.FilePath = filePath;
+            this.m_fileName = filePath;
 
             this.ListViewItem = new ListViewItem(Path.GetFileName(filePath));
             this.ListViewItem.Tag = this;
@@ -34,42 +35,70 @@ namespace Kisbo.Core
             var kisboFile = new KisboFile(form, filePath);
 
             form.ctlList.Items.Add(kisboFile.ListViewItem);
-            form.m_files.Add(kisboFile);
-            form.m_working.Add(kisboFile);
+            form.m_list.Add(kisboFile);
         }
 
         public void Remove()
         {
             this.Removed = true;
 
-            this.m_form.m_files.Remove(this);
-            this.m_form.m_working.Remove(this);
             this.m_form.ctlList.Items.RemoveAt(this.ListViewItem.Index);
+            
+            this.m_form.m_list.Remove(this);
+
+            if (!this.NotTodo)
+            {
+                Interlocked.Decrement(ref this.m_form.m_taskbarMax);
+
+                if (this.Worked)
+                    Interlocked.Decrement(ref this.m_form.m_taskbarVal);
+            }
         }
 
+        private readonly object m_lock = new object();
+
         private readonly SearchWindow m_form;
-        private readonly ListViewItem ListViewItem;
-        public readonly string FilePath;
+        public readonly ListViewItem ListViewItem;
 
-        public bool Removed;
+        public readonly string m_fileName;
+        public string FilePath { get { return this.m_fileName; } }
 
-        public string GoogleUrl;
+        private bool m_removed;
+        public bool Removed
+        {
+            get { lock (this.m_lock) return this.m_removed; }
+            set { lock (this.m_lock) this.m_removed = value; }
+        }
 
-        public States State;
+        public bool NotTodo { get; set; }
+
+        private string m_googleUrl;
+        public string GoogleUrl
+        {
+            get { lock (this.m_lock) return this.m_googleUrl; }
+            set { lock (this.m_lock) this.m_googleUrl = value; }
+        }
+
+        private States m_state;
+        public States State
+        {
+            get { lock (this.m_lock) return this.m_state; }
+            set { lock (this.m_lock) this.m_state = value; }
+        }
+        public bool Success { get { return this.State == States.Complete || this.State == States.Pass || this.State == States.NoResult; } }
         public bool Worked { get { return this.State != States.Wait && this.State != States.Working; } }
 
-        public void SetState(States value)
+        public void SetStatus()
         {
-            this.State = value;
-            this.ListViewItem.StateImageIndex = (int)value;
+            this.m_form.Invoke(new Action(() => this.ListViewItem.StateImageIndex = (int)this.State));
         }
         public void SetBeforeResolution(Size value)
         {
-            this.ListViewItem.SubItems[1].Text = string.Format("{0}x{1}", value.Width, value.Height);
+            this.m_form.Invoke(new Action(() => this.ListViewItem.SubItems[1].Text = string.Format("{0}x{1}", value.Width, value.Height)));
         }
         public void SetAfterResolution(Size value)
         {
-            this.ListViewItem.SubItems[2].Text = string.Format("{0}x{1}", value.Width, value.Height);
+            this.m_form.Invoke(new Action(() => this.ListViewItem.SubItems[2].Text = string.Format("{0}x{1}", value.Width, value.Height)));
         }
     };
 }

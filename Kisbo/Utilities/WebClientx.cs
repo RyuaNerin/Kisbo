@@ -22,14 +22,13 @@ namespace Kisbo.Utilities
             GC.SuppressFinalize(this);
         }
 
-        private static readonly CookieContainer CookieContainer = new CookieContainer();
+        //private static readonly CookieContainer CookieContainer = new CookieContainer();
         private readonly CancellationToken m_token;
 
         private readonly MemoryStream m_buffer;
         private readonly StreamReader m_reader;
 
-        public Uri m_referer;
-        public string Location { get; private set; }
+        public Uri LastUrl { get; private set; }
 
         public string DownloadString(Uri uri)
         {
@@ -38,9 +37,12 @@ namespace Kisbo.Utilities
 
             return m_reader.ReadToEnd();
         }
-        public bool UploadData(Uri uri, Stream data, string contentType)
+        public string UploadData(Uri uri, Stream data, string contentType)
         {
-            return Request(uri, data, contentType);
+            if (!Request(uri, data, contentType))
+                return null;
+
+            return m_reader.ReadToEnd();
         }
 
         private bool Request(Uri uri, Stream data, string contentType)
@@ -48,13 +50,13 @@ namespace Kisbo.Utilities
             this.m_buffer.SetLength(0);
 
             var req = WebRequest.Create(uri) as HttpWebRequest;
-            req.AllowAutoRedirect = false;
-            req.CookieContainer = CookieContainer;
+            //req.AllowAutoRedirect = false;
+            //req.CookieContainer = CookieContainer;
             req.UserAgent = UserAgent;
             req.AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip;
 
-            if (this.m_referer != null)
-                req.Referer = this.m_referer.AbsoluteUri;
+            if (this.LastUrl != null)
+                req.Referer = this.LastUrl.AbsoluteUri;
 
             Stream stream;
             int read;
@@ -80,8 +82,7 @@ namespace Kisbo.Utilities
             {
                 using (var res = req.GetResponse())
                 {
-                    this.m_referer = res.ResponseUri;
-                    this.Location = res.Headers[HttpResponseHeader.Location];
+                    this.LastUrl = res.ResponseUri;
 
                     using (stream = res.GetResponseStream())
                     {

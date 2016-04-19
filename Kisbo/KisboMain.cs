@@ -43,7 +43,7 @@ namespace Kisbo
 
             ServicePointManager.UseNagleAlgorithm = false;
             ServicePointManager.Expect100Continue = false;
-            ServicePointManager.MaxServicePoints = 20;
+            ServicePointManager.MaxServicePoints = 64;
         }
 
         private static readonly string[] AllowExtension = { ".bmp", ".jpg", ".jpeg", ".png", ".gif" };
@@ -102,7 +102,7 @@ namespace Kisbo
                     Application.ApplicationExit += (s, e) => instance.Release();
                     
                     var frm = new SearchWindow();
-                    instance.DataReceived += (e) => frm.AddFile(e);
+                    instance.DataReceived += frm.AddFile;
                     instance.Ready();
 
                     frm.AddFile(files);

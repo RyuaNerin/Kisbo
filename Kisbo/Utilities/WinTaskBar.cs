@@ -61,9 +61,9 @@ namespace WinTaskbar
         }
 
         #region ProgressBar
-        protected int m_minimum = 0;
-        protected int m_value = 0;
-        protected int m_maximum = 100;
+        protected ulong m_minimum = 0;
+        protected ulong m_value = 0;
+        protected ulong m_maximum = 100;
         protected TaskbarProgressBarState m_state = TaskbarProgressBarState.NoProgress;
 
         public class TaskbarProgress
@@ -75,7 +75,7 @@ namespace WinTaskbar
                 m_taskbar = taskbar;
             }
 
-            public int Minimum
+            public ulong Minimum
             {
                 get { return this.m_taskbar.m_minimum; }
                 set
@@ -92,7 +92,7 @@ namespace WinTaskbar
                 }
             }
 
-            public int Value
+            public ulong Value
             {
                 get { return this.m_taskbar.m_value; }
                 set
@@ -109,7 +109,7 @@ namespace WinTaskbar
                 }
             }
 
-            public int Maximum
+            public ulong Maximum
             {
                 get { return this.m_taskbar.m_maximum; }
                 set
@@ -137,7 +137,7 @@ namespace WinTaskbar
             }
         }
 
-        public void SetProgressValue(int minimumValue, int currentValue, int maximumValue)
+        public void SetProgressValue(long minimumValue, long currentValue, long maximumValue)
         {
             if (currentValue < minimumValue)
                 throw new ArgumentOutOfRangeException("currentValue must be same or bigger than minimumvalue");
@@ -148,38 +148,32 @@ namespace WinTaskbar
             if (maximumValue < minimumValue)
                 throw new ArgumentOutOfRangeException("maximumValue must be same or bigger than minimumValue");
 
-            this.m_minimum = minimumValue;
-            this.m_value = currentValue;
-            this.m_maximum = maximumValue;
+            this.m_minimum = (ulong)minimumValue;
+            this.m_value = (ulong)currentValue;
+            this.m_maximum = (ulong)maximumValue;
 
             this.SetProgressValue();
         }
 
-        public void SetProgressValue(int currentValue, int maximumValue)
+        public void SetProgressValue(long currentValue, long maximumValue)
         {
             if (maximumValue < currentValue)
                 throw new ArgumentOutOfRangeException("maximumValue must be same or bigger than currentValue");
 
-            this.m_value = currentValue + this.m_minimum;
-            this.m_maximum = maximumValue + this.m_minimum;
+            this.m_value = (ulong)currentValue + this.m_minimum;
+            this.m_maximum = (ulong)maximumValue + this.m_minimum;
 
             this.SetProgressValue();
         }
 
         protected void SetProgressValue()
         {
-            UInt64 min, val, max;
-
-            min = Convert.ToUInt64(this.m_minimum);
-            val = Convert.ToUInt64(this.m_value);
-            max = Convert.ToUInt64(this.m_maximum);
-
-            this.m_taskbarList.SetProgressValue(this.OwnerHandle, val - min, max - min);
+            this.m_taskbarList.SetProgressValue(this.OwnerHandle, this.m_value - this.m_minimum, this.m_maximum - this.m_minimum);
         }
 
         public void SetProgressState(TaskbarProgressBarState state)
         {
-            if (this.m_state != state) return;
+            if (this.m_state == state) return;
 
             this.m_state = state;
 
