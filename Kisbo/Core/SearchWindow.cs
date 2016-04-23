@@ -17,7 +17,7 @@ namespace Kisbo.Core
 {
     internal partial class SearchWindow : Form
     {
-        private const int Workers = 4;
+        private const int Workers = 6;
 
         public SearchWindow()
         {
@@ -28,15 +28,12 @@ namespace Kisbo.Core
             if (!KisboMain.IsAdministratorMode)
                 this.ctlInstallContextMenu.Image = this.ctlUninstallContextMenu.Image = UacImage.GetImage();
 
-            this.m_taskbar = new Taskbar(this);
+            this.m_taskbar = (ITaskbarList4)new CTaskbarList();
+            this.m_taskbar.HrInit();
         }
 
-        private void ctlCopyRight_DoubleClick(object sender, EventArgs e)
-        {
-            Process.Start(new ProcessStartInfo { UseShellExecute = true, FileName = "\"https://github.com/RyuaNerin/Kisbo\"" }).Dispose();
-        }
-
-        private readonly Taskbar m_taskbar;
+        private readonly ITaskbarList4 m_taskbar;
+        private readonly ManualResetEvent m_search = new ManualResetEvent(true);
         private readonly ManualResetEvent m_pauseHandler = new ManualResetEvent(true);
         private readonly ManualResetEvent m_newItemHandler = new ManualResetEvent(false);
         private readonly CancellationTokenSource m_cancel = new CancellationTokenSource();
@@ -44,12 +41,44 @@ namespace Kisbo.Core
         public readonly object m_lock = new object();
         public readonly List<KisboFile> m_list = new List<KisboFile>();
 
-        private Task[] m_workers = new Task[Workers];
+        private readonly Task[] m_workers = new Task[Workers];
         private Uri m_googleUri = new Uri("https://google.com/");
 
         public long m_taskbarVal = 0;
-        public long m_taskbarMax = 0; 
-        
+        public long m_taskbarMax = 0;
+
+        private void ctlCopyRight_DoubleClick(object sender, EventArgs e)
+        {
+            Process.Start(new ProcessStartInfo { UseShellExecute = true, FileName = "\"https://github.com/RyuaNerin/Kisbo\"" }).Dispose();
+        }
+
+        private void SearchWindow_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            this.ctlNotify.Visible = false;
+            this.Hide();
+            
+            this.m_search.Set();
+            this.m_pauseHandler.Set();
+            this.m_newItemHandler.Set();
+            this.m_cancel.Cancel();
+            Task.WaitAll(this.m_workers);
+            Application.ExitThread();
+            Application.Exit();
+        }
+
+        private void SearchWindow_Shown(object sender, EventArgs e)
+        {
+            this.SetProgress();
+            Task.Factory.StartNew(this.Search);
+            Task.Factory.StartNew(new Action(() => {
+                var update = LastRelease.CheckNewVersion();
+                if (update != null)
+                    if (this.ShowMessageBox("새 업데이트가 있어요!", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) == DialogResult.OK)
+                        Process.Start(new ProcessStartInfo { UseShellExecute = true, FileName = string.Format("\"{0}\"", update.HtmlUrl) }).Dispose();
+            }));
+        }
+
+        #region 검색
         public void AddFile(byte[] data)
         {
             if (data.Length == 1 && data[0] == 0xFE)
@@ -60,7 +89,15 @@ namespace Kisbo.Core
         public void AddFile(IEnumerable<string> data)
         {
             if (this.InvokeRequired)
-                this.Invoke(new Action<IEnumerable<string>>(this.AddFile), data);
+            {
+                try
+                {
+                    this.Invoke(new Action<IEnumerable<string>>(this.AddFile), data);	
+                }
+                catch
+                {
+                }
+            }
             else
             {
                 this.ctlList.BeginUpdate();
@@ -73,7 +110,7 @@ namespace Kisbo.Core
 
                     foreach (var path in data)
                     {
-                        if (KisboMain.Check(path) && !this.m_list.Exists(e => e.FilePath.Equals(path, StringComparison.OrdinalIgnoreCase)))
+                        if (KisboMain.Check(path) && !this.m_list.Exists(e => e.OriginalFilePath.Equals(path, StringComparison.OrdinalIgnoreCase)))
                         {
                             lst.Add(path);
                         }
@@ -96,52 +133,17 @@ namespace Kisbo.Core
             }
         }
 
-        private void SearchWindow_FormClosed(object sender, FormClosedEventArgs e)
-        {
-            this.ctlNotify.Visible = false;
-            this.Hide();
-            
-            this.m_newItemHandler.Set();
-            this.m_pauseHandler.Set();
-            this.m_cancel.Cancel(true);
-            Task.WaitAll(this.m_workers);
-            Application.Exit();
-        }
-
-        private void SearchWindow_Shown(object sender, EventArgs e)
-        {
-            this.SetProgress();
-            Task.Factory.StartNew(this.Search);
-            Task.Factory.StartNew(new Action(() => {
-                var update = LastRelease.CheckNewVersion();
-                if (update != null)
-                    if (this.ShowMessageBox("새 업데이트가 있어요!", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) == DialogResult.OK)
-                        Process.Start(new ProcessStartInfo { UseShellExecute = true, FileName = string.Format("\"{0}\"", update.HtmlUrl) }).Dispose();
-            }));
-        }
-        
-        private void ctlPause_Click(object sender, EventArgs e)
-        {
-            if (this.m_pauseHandler.WaitOne(0))
-            {
-                this.m_pauseHandler.Reset();
-                this.ctlPause.Text = "재시작";
-            }
-            else
-            {
-                this.m_pauseHandler.Set();
-                this.ctlPause.Text = "일시정지";
-            }
-
-            this.SetProgress();
-        }
-
-        #region 검색
         public void SetProgress()
         {
             if (this.InvokeRequired)
             {
-                this.Invoke(new Action(this.SetProgress));
+                try
+                {
+                    this.Invoke(new Action(this.SetProgress));
+                }
+                catch
+                {
+                }
             }
             else
             {
@@ -152,22 +154,39 @@ namespace Kisbo.Core
 
                 if (val != max)
                 {
-                    this.m_taskbar.SetProgressValue(val + 1, max + 1);
+                    this.m_taskbar.SetProgressValue(this.Handle, (ulong)val + 1, (ulong)max + 1);
 
                     if (this.m_pauseHandler.WaitOne(0))
-                        this.m_taskbar.SetProgressState(TaskbarProgressBarState.Normal);
+                        this.m_taskbar.SetProgressState(this.Handle, TBPFLAG.TBPF_NORMAL);
                     else
-                        this.m_taskbar.SetProgressState(TaskbarProgressBarState.Paused);
+                        this.m_taskbar.SetProgressState(this.Handle, TBPFLAG.TBPF_PAUSED);
                 }
                 else
-                    this.m_taskbar.SetProgressState(TaskbarProgressBarState.NoProgress);
+                    this.m_taskbar.SetProgressState(this.Handle, TBPFLAG.TBPF_NOPROGRESS);
             }
+        }
+
+        public void DecrementTaskbar(bool val)
+        {
+            if (val)
+                Interlocked.Decrement(ref this.m_taskbarVal);
+            else
+                Interlocked.Decrement(ref this.m_taskbarMax);
         }
         
         private DialogResult ShowMessageBox(string text, MessageBoxButtons buttons, MessageBoxIcon icon)
         {
             if (this.InvokeRequired)
-                return (DialogResult)this.Invoke(new Func<string, MessageBoxButtons, MessageBoxIcon, DialogResult>(this.ShowMessageBox), text, buttons, icon);
+            {
+                try
+                {
+                    return (DialogResult)this.Invoke(new Func<string, MessageBoxButtons, MessageBoxIcon, DialogResult>(this.ShowMessageBox), text, buttons, icon);
+                }
+                catch
+                {
+                    return DialogResult.None;
+                }
+            }
             else
                 return MessageBox.Show(this, text, this.Text, buttons, icon);
         }
@@ -182,7 +201,7 @@ namespace Kisbo.Core
                 req.UserAgent = WebClientx.UserAgent;
                 
                 using (var res = req.GetResponse())
-                    this.m_googleUri = new Uri(res.ResponseUri, "/");
+                    this.m_googleUri = new UriBuilder(new Uri(res.ResponseUri, "/")) { Scheme = "https" }.Uri;
             }
             catch
             {
@@ -307,7 +326,7 @@ namespace Kisbo.Core
 
             try
             {
-                using (var img = Image.FromFile(file.FilePath))
+                using (var img = Image.FromFile(file.OriginalFilePath))
                     file.SetBeforeResolution(oldSize = img.Size);
             }
             catch
@@ -321,7 +340,7 @@ namespace Kisbo.Core
                     var origBoundary = "-----" + Guid.NewGuid().ToString("N");
                     var boundary = "--" + origBoundary;
 
-                    var info = new FileInfo(file.FilePath);
+                    var info = new FileInfo(file.OriginalFilePath);
 
                     // DELETE BOM
                     writer.BaseStream.SetLength(0);
@@ -348,11 +367,49 @@ namespace Kisbo.Core
 
                     writer.BaseStream.Position = 0;
 
-                    if ((body = wc.UploadData(new Uri(this.m_googleUri, "/searchbyimage/upload"), writer.BaseStream, "multipart/form-data; boundary=" + origBoundary)) == null)
-                        return States.Error;
+                    do
+                    {
+                        if (token.IsCancellationRequested) return States.Error;
+
+                        if (!this.m_search.WaitOne(0))
+                        {
+                            file.State = States.WaitSearch;
+                            file.SetStatus();
+
+                            this.m_search.WaitOne();
+                            if (token.IsCancellationRequested) return States.Error;
+
+                            file.State = States.Working;
+                            file.SetStatus();
+                        }
+
+                        body = wc.UploadData(new Uri(this.m_googleUri, "/searchbyimage/upload"), writer.BaseStream, "multipart/form-data; boundary=" + origBoundary);
+                        if (body == null)
+                            return States.Error;
+
+                        if (body.IndexOf("topstuff", StringComparison.OrdinalIgnoreCase) == -1)
+                        {
+                            body = null;
+
+                            if (this.m_search.WaitOne(0))
+                            {
+                                file.State = States.WaitSearch;
+                                file.SetStatus();
+
+                                this.m_search.Reset();
+                                Thread.Sleep(60 * 1000);
+                                this.m_search.Set();
+
+                                if (token.IsCancellationRequested) return States.Error;
+
+                                file.State = States.Working;
+                                file.SetStatus();
+                            }
+                        }
+                    } while (body == null);
                 }
 
-                file.GoogleUrl = wc.LastUrl.AbsoluteUri;
+                file.GoogleUrl = wc.ResponseUri.AbsoluteUri;
 
                 int startIndex = body.IndexOf("<div class=\"card-section\">", StringComparison.OrdinalIgnoreCase);
                 int endIndex   = body.IndexOf("<hr class=\"rgsep _l4\">", startIndex, StringComparison.OrdinalIgnoreCase);
@@ -414,14 +471,16 @@ namespace Kisbo.Core
 
                         if (file.Removed) break;
 
-                        dir = Path.Combine(Path.GetDirectoryName(file.FilePath), "kisbo-original");
+                        dir = Path.Combine(Path.GetDirectoryName(file.OriginalFilePath), "kisbo-original");
                         if (!Directory.Exists(dir))
                             Directory.CreateDirectory(dir);
 
-                        File.Move(file.FilePath, Path.Combine(dir, Path.GetFileName(file.FilePath)));
+                        File.Move(file.OriginalFilePath, Path.Combine(dir, Path.GetFileName(file.OriginalFilePath)));
 
-                        newPath = Path.ChangeExtension(file.FilePath, newExtension);
+                        newPath = Path.ChangeExtension(file.OriginalFilePath, newExtension);
                         File.Move(tempPath, GetSafeFileName(newPath, ""));
+
+                        file.NewFilePath = newPath;
 
                         return States.Complete;
                     }
@@ -468,9 +527,35 @@ namespace Kisbo.Core
         #endregion
 
         #region 메뉴
+        private void ctlPause_Click(object sender, EventArgs e)
+        {
+            if (this.m_pauseHandler.WaitOne(0))
+            {
+                this.m_pauseHandler.Reset();
+                this.ctlPause.Text = "재시작";
+            }
+            else
+            {
+                this.m_pauseHandler.Set();
+                this.ctlPause.Text = "일시정지";
+            }
+
+            this.SetProgress();
+        }
+
         private void ctlRemoveSelected_Click(object sender, EventArgs e)
         {
             if (this.ctlList.SelectedItems.Count == 0) return;
+
+            for (int i = 0; i <this.ctlList.SelectedItems.Count; ++i)
+            {
+                if (((KisboFile)this.ctlList.SelectedItems[i].Tag).Working)
+                {
+                    if (this.ShowMessageBox("진행중인 파일이 있는데 계속할까요?", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.No)
+                        return;
+                    break;
+                }
+            }
 
             lock (this.m_lock)
             {
@@ -495,6 +580,16 @@ namespace Kisbo.Core
 
         private void ctlClearAll_Click(object sender, EventArgs e)
         {
+            for (int i = 0; i <this.ctlList.SelectedItems.Count; ++i)
+            {
+                if (((KisboFile)this.ctlList.SelectedItems[i].Tag).Working)
+                {
+                    if (this.ShowMessageBox("진행중인 파일이 있는데 계속할까요?", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.No)
+                        return;
+                    break;
+                }
+            }
+
             lock (this.m_lock)
             {
                 Debug.WriteLine("ctlClearAll_Click Lock");
@@ -536,31 +631,6 @@ namespace Kisbo.Core
                 Debug.WriteLine("ctlRemoveCompleted_Click Unlock");
             }
         }
-
-        private void ctlRework_Click(object sender, EventArgs e)
-        {
-            lock (this.m_lock)
-            {
-                Debug.WriteLine("ctlRework_Click Lock");
-
-                KisboFile item;
-                for (int i = 0; i < this.ctlList.SelectedItems.Count; ++i)
-                {
-                    item = ((KisboFile)this.ctlList.SelectedItems[i].Tag);
-                    if (item.State == States.Error)
-                    {
-                        item.State = States.Wait;
-                        this.ctlList.SelectedItems[i].StateImageIndex = (int)States.Wait;
-
-                        Interlocked.Increment(ref this.m_taskbarMax);
-                    }
-                }
-
-                this.SetProgress();
-
-                Debug.WriteLine("ctlRework_Click Unlock");
-            }
-        }
         
         private void ctlListMenu_Opening(object sender, System.ComponentModel.CancelEventArgs e)
         {
@@ -588,13 +658,17 @@ namespace Kisbo.Core
                 }
             }
         }
-        private void openDirectoryToolStripMenuItem_Click(object sender, EventArgs e)
+        private void ctlListMenu_Closing(object sender, ToolStripDropDownClosingEventArgs e)
+        {
+            this.ctlOpenGoogleResult.Enabled = false;
+            this.ctlRework.Enabled = false;
+        }
+
+        private void ctlOpenDirectory_Click(object sender, EventArgs e)
         {
             if (this.ctlList.SelectedItems.Count == 1)
             {
-                var file = (KisboFile)this.ctlList.SelectedItems[0].Tag;
-                using (Process.Start(new ProcessStartInfo("explorer", string.Format("/select,\"{0}\"", file.FilePath))))
-                { }
+                Process.Start(new ProcessStartInfo("explorer", string.Format("/select,\"{0}\"", ((KisboFile)this.ctlList.SelectedItems[0].Tag).FilePath))).Dispose();
             }
             else if (this.ctlList.SelectedItems.Count > 1)
             {
@@ -618,7 +692,7 @@ namespace Kisbo.Core
             }
         }
 
-        private void openGoogleResultToolStripMenuItem_Click(object sender, EventArgs e)
+        private void ctlOpenGoogleResult_Click(object sender, EventArgs e)
         {
             if (this.ctlList.SelectedItems.Count <= 10)
             {
@@ -628,9 +702,33 @@ namespace Kisbo.Core
                     file = (KisboFile)this.ctlList.SelectedItems[0].Tag;
 
                     if (file.GoogleUrl != null)
-                        using (Process.Start(new ProcessStartInfo { UseShellExecute = true, FileName = string.Format("\"{0}\"", file.GoogleUrl) }))
-                        { }
+                        Process.Start(new ProcessStartInfo { UseShellExecute = true, FileName = string.Format("\"{0}\"", file.GoogleUrl) }).Dispose();
                 }
+            }
+        }
+
+        private void ctlRework_Click(object sender, EventArgs e)
+        {
+            lock (this.m_lock)
+            {
+                Debug.WriteLine("ctlRework_Click Lock");
+
+                KisboFile item;
+                for (int i = 0; i < this.ctlList.SelectedItems.Count; ++i)
+                {
+                    item = ((KisboFile)this.ctlList.SelectedItems[i].Tag);
+                    if (item.State == States.Error)
+                    {
+                        item.Clear();
+                        this.ctlList.SelectedItems[i].StateImageIndex = (int)States.Wait;
+
+                        Interlocked.Increment(ref this.m_taskbarMax);
+                    }
+                }
+
+                this.SetProgress();
+
+                Debug.WriteLine("ctlRework_Click Unlock");
             }
         }
 
@@ -646,7 +744,7 @@ namespace Kisbo.Core
         }
         #endregion
 
-        #region 파일 추가하는 부분
+        #region Drag And Drop
         private void ctlList_DragEnter(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
@@ -849,9 +947,9 @@ namespace Kisbo.Core
 
         private void ctlExit_Click(object sender, EventArgs e)
         {
+            if (this.ShowMessageBox("Kisbo 를 종료할까요?", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) == DialogResult.Cancel) return;
             Application.Exit();
         }
         #endregion
-
     }
 }

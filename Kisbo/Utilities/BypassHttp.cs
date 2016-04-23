@@ -13,17 +13,20 @@ namespace Kisbo.Utilities
     {        
         private const string UserAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.110 Safari/537.36";
 
-        private readonly static LockByKey<string> Lock = new LockByKey<string>();
         private readonly static CookieContainer CookieContainer = new CookieContainer();
         private readonly static Jint.Engine JSEngine = new Jint.Engine();
 
         public static bool GetResponse(Uri uri, Stream stream, CancellationToken token, bool passException = false)
         {
+            if (token.IsCancellationRequested) return false;
+
             if (!passException)
-                Lock.Wait(uri.Host);
+                Monitor.Wait(string.Intern(uri.Host));
+
+            if (token.IsCancellationRequested) return false;
 
             var req = WebRequest.Create(uri) as HttpWebRequest;
-            req.Referer = new Uri(uri, "/").AbsoluteUri;
+            req.Referer = uri.AbsoluteUri;
             req.UserAgent = UserAgent;
             req.Timeout = 2000;
             req.ReadWriteTimeout = 2000;
@@ -105,7 +108,10 @@ namespace Kisbo.Utilities
         {
             // http://stackoverflow.com/questions/32425973/how-can-i-get-html-from-page-with-cloudflare-ddos-portection#2
 
-            using (Lock.GetLock(uri.Host))
+            var host = string.Intern(uri.Host);
+
+            Monitor.Enter(host);
+            try
             {
                 // 기존 쿠키 추가
                 lock (CookieContainer)
@@ -128,15 +134,13 @@ namespace Kisbo.Utilities
                     return false;
 
                 var cookie_url = string.Format("{0}://{1}/cdn-cgi/l/chk_jschl", uri.Scheme, uri.Host);
-                var uri_builder = new UriBuilder(cookie_url);
 
                 var query = new Dictionary<string, object>();
                 query["jschl_vc"] = challenge;
                 query["pass"] = challenge_pass;
                 query["jschl_answer"] = solved;
-                uri_builder.Query = ToString(query);
 
-                newUri = uri_builder.Uri;
+                newUri = new UriBuilder(cookie_url) { Query = ToString(query) }.Uri;
 
                 var req = WebRequest.Create(newUri) as HttpWebRequest;
                 req.AllowAutoRedirect = false;
@@ -168,6 +172,10 @@ namespace Kisbo.Utilities
                 }
 
                 return GetResponse(uri, stream, token, true);
+            }
+            finally
+            {
+                Monitor.Exit(host);
             }
         }
 

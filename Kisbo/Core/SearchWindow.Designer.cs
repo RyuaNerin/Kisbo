@@ -62,6 +62,8 @@
             this.ctlNotify = new System.Windows.Forms.NotifyIcon(this.components);
             this.ctlNofityMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.ctlExit = new System.Windows.Forms.ToolStripMenuItem();
+            this.ttp = new System.Windows.Forms.ToolTip(this.components);
+            this.ctlExit0 = new System.Windows.Forms.ToolStripMenuItem();
             this.ctlListMenu.SuspendLayout();
             this.ctlMenu.SuspendLayout();
             this.ctlNofityMenu.SuspendLayout();
@@ -118,32 +120,35 @@
             this.toolStripSeparator1,
             this.ctlRework});
             this.ctlListMenu.Name = "ctlListMenu";
-            this.ctlListMenu.Size = new System.Drawing.Size(191, 76);
+            this.ctlListMenu.Size = new System.Drawing.Size(236, 76);
+            this.ctlListMenu.Closing += new System.Windows.Forms.ToolStripDropDownClosingEventHandler(this.ctlListMenu_Closing);
             this.ctlListMenu.Opening += new System.ComponentModel.CancelEventHandler(this.ctlListMenu_Opening);
             // 
             // ctlOpenDirectory
             // 
             this.ctlOpenDirectory.Name = "ctlOpenDirectory";
-            this.ctlOpenDirectory.Size = new System.Drawing.Size(190, 22);
+            this.ctlOpenDirectory.Size = new System.Drawing.Size(235, 22);
             this.ctlOpenDirectory.Text = "폴더 열기";
-            this.ctlOpenDirectory.Click += new System.EventHandler(this.openDirectoryToolStripMenuItem_Click);
+            this.ctlOpenDirectory.Click += new System.EventHandler(this.ctlOpenDirectory_Click);
             // 
             // ctlOpenGoogleResult
             // 
             this.ctlOpenGoogleResult.Name = "ctlOpenGoogleResult";
-            this.ctlOpenGoogleResult.Size = new System.Drawing.Size(190, 22);
+            this.ctlOpenGoogleResult.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.W)));
+            this.ctlOpenGoogleResult.Size = new System.Drawing.Size(235, 22);
             this.ctlOpenGoogleResult.Text = "이미지 검색결과 열기";
-            this.ctlOpenGoogleResult.Click += new System.EventHandler(this.openGoogleResultToolStripMenuItem_Click);
+            this.ctlOpenGoogleResult.Click += new System.EventHandler(this.ctlOpenGoogleResult_Click);
             // 
             // toolStripSeparator1
             // 
             this.toolStripSeparator1.Name = "toolStripSeparator1";
-            this.toolStripSeparator1.Size = new System.Drawing.Size(187, 6);
+            this.toolStripSeparator1.Size = new System.Drawing.Size(232, 6);
             // 
             // ctlRework
             // 
             this.ctlRework.Name = "ctlRework";
-            this.ctlRework.Size = new System.Drawing.Size(190, 22);
+            this.ctlRework.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.R)));
+            this.ctlRework.Size = new System.Drawing.Size(235, 22);
             this.ctlRework.Text = "재시도";
             this.ctlRework.Click += new System.EventHandler(this.ctlRework_Click);
             // 
@@ -157,6 +162,7 @@
             this.ctlListState.Images.SetKeyName(3, "");
             this.ctlListState.Images.SetKeyName(4, "");
             this.ctlListState.Images.SetKeyName(5, "");
+            this.ctlListState.Images.SetKeyName(6, "");
             // 
             // ctlOpenFile
             // 
@@ -166,6 +172,7 @@
             // 
             this.ctlMenu.Font = new System.Drawing.Font("맑은 고딕", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.ctlMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.ctlExit0,
             this.ctlPause,
             this.ctlAdd,
             this.ctlMenuList,
@@ -337,6 +344,13 @@
             this.ctlExit.Text = "종료";
             this.ctlExit.Click += new System.EventHandler(this.ctlExit_Click);
             // 
+            // ctlExit0
+            // 
+            this.ctlExit0.Name = "ctlExit0";
+            this.ctlExit0.Size = new System.Drawing.Size(43, 20);
+            this.ctlExit0.Text = "종료";
+            this.ctlExit0.Click += new System.EventHandler(this.ctlExit_Click);
+            // 
             // SearchWindow
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 14F);
@@ -399,6 +413,8 @@
         private System.Windows.Forms.ToolStripMenuItem ctlExit;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
         private System.Windows.Forms.ToolStripMenuItem ctlRework;
+        private System.Windows.Forms.ToolTip ttp;
+        private System.Windows.Forms.ToolStripMenuItem ctlExit0;
 
     }
 }

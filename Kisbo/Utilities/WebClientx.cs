@@ -18,6 +18,7 @@ namespace Kisbo.Utilities
         }
         public void Dispose()
         {
+            this.m_reader.Close();
             this.m_buffer.Dispose();
             GC.SuppressFinalize(this);
         }
@@ -28,7 +29,7 @@ namespace Kisbo.Utilities
         private readonly MemoryStream m_buffer;
         private readonly StreamReader m_reader;
 
-        public Uri LastUrl { get; private set; }
+        public Uri ResponseUri { get; private set; }
 
         public string DownloadString(Uri uri)
         {
@@ -50,13 +51,12 @@ namespace Kisbo.Utilities
             this.m_buffer.SetLength(0);
 
             var req = WebRequest.Create(uri) as HttpWebRequest;
-            //req.AllowAutoRedirect = false;
             //req.CookieContainer = CookieContainer;
             req.UserAgent = UserAgent;
             req.AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip;
 
-            if (this.LastUrl != null)
-                req.Referer = this.LastUrl.AbsoluteUri;
+            if (this.ResponseUri != null)
+                req.Referer = this.ResponseUri.AbsoluteUri;
 
             Stream stream;
             int read;
@@ -82,7 +82,7 @@ namespace Kisbo.Utilities
             {
                 using (var res = req.GetResponse())
                 {
-                    this.LastUrl = res.ResponseUri;
+                    this.ResponseUri = res.ResponseUri;
 
                     using (stream = res.GetResponseStream())
                     {

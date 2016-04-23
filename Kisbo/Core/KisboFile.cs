@@ -2,18 +2,39 @@
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
-using System.Threading;
 
 namespace Kisbo.Core
 {
     internal enum States
     {
+        /// <summary>
+        /// 대기중
+        /// </summary>
         Wait = 0,
+        /// <summary>
+        /// 작업중
+        /// </summary>
         Working = 1,
-        Complete = 2,
-        Pass = 3,
-        NoResult = 4,
-        Error = 5,
+        /// <summary>
+        /// 잠시후 다시 검색해주세요
+        /// </summary>
+        WaitSearch = 2,
+        /// <summary>
+        /// 성공
+        /// </summary>
+        Complete = 3,
+        /// <summary>
+        /// 스킵
+        /// </summary>
+        Pass = 4,
+        /// <summary>
+        /// 검색결과 없음
+        /// </summary>
+        NoResult = 5,
+        /// <summary>
+        /// 에러
+        /// </summary>
+        Error = 6,
     }
 
     internal class KisboFile
@@ -48,11 +69,19 @@ namespace Kisbo.Core
 
             if (!this.NotTodo)
             {
-                Interlocked.Decrement(ref this.m_form.m_taskbarMax);
+                this.m_form.DecrementTaskbar(true);
 
                 if (this.Worked)
-                    Interlocked.Decrement(ref this.m_form.m_taskbarVal);
+                    this.m_form.DecrementTaskbar(false);
             }
+        }
+
+        public void Clear()
+        {
+            this.NewFilePath = null;
+            this.Removed = false;
+            this.GoogleUrl = null;
+            this.State = States.Wait;
         }
 
         private readonly object m_lock = new object();
@@ -61,8 +90,10 @@ namespace Kisbo.Core
         public readonly ListViewItem ListViewItem;
 
         public readonly string m_fileName;
-        public string FilePath { get { return this.m_fileName; } }
-
+        public string OriginalFilePath { get { return this.m_fileName; } }
+        public string NewFilePath { get; set; }
+        public string FilePath { get { return this.NewFilePath == null ? this.m_fileName : this.NewFilePath; } }
+        
         private bool m_removed;
         public bool Removed
         {
@@ -85,8 +116,9 @@ namespace Kisbo.Core
             get { lock (this.m_lock) return this.m_state; }
             set { lock (this.m_lock) this.m_state = value; }
         }
-        public bool Success { get { return this.State == States.Complete || this.State == States.Pass || this.State == States.NoResult; } }
-        public bool Worked { get { return this.State != States.Wait && this.State != States.Working; } }
+        public bool Working { get { lock (this.m_lock) return this.m_state == States.Working  || this.m_state == States.WaitSearch; } }
+        public bool Worked  { get { lock (this.m_lock) return this.m_state != States.Wait     && this.m_state != States.Working && this.m_state != States.WaitSearch; } }
+        public bool Success { get { lock (this.m_lock) return this.m_state == States.Complete || this.m_state == States.Pass    || this.m_state == States.NoResult; } }
 
         public void SetStatus()
         {

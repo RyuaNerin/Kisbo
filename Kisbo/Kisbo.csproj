@@ -22,7 +22,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
@@ -95,7 +95,6 @@
     <Compile Include="Utilities\Base64Stream.cs" />
     <Compile Include="Utilities\ExplorerHelper.cs" />
     <Compile Include="Utilities\BypassHttp.cs" />
-    <Compile Include="Utilities\LockByKey.cs" />
     <Compile Include="Utilities\InstanceHelperEx.cs" />
     <Compile Include="Utilities\UacImage.cs" />
     <Compile Include="Utilities\WebClientx.cs" />

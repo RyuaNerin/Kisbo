@@ -12,7 +12,7 @@ namespace Kisbo.Core
         private static readonly XmlObjectSerializer Serializer = new DataContractJsonSerializer(typeof(RGMeta));
         public static RGMeta Parse(string json)
         {
-            using (var stream = new MemoryStream(Encoding.ASCII.GetBytes(json)))
+            using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(json)))
                 return (RGMeta)Serializer.ReadObject(stream);
         }
 
