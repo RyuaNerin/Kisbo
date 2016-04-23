@@ -59,6 +59,7 @@ namespace Kisbo
             return false;
         }
 
+        public static InstanceHelperEx Instance;
         [STAThread]
         public static int Main(string[] args)
         {
@@ -95,15 +96,13 @@ namespace Kisbo
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            using (var instance = new InstanceHelperEx(KISBO_MUTEX_NAME))
+            using (Instance = new InstanceHelperEx(KISBO_MUTEX_NAME))
             {
-                if (instance.IsInstance)
-                {
-                    Application.ApplicationExit += (s, e) => instance.Release();
-                    
+                if (Instance.IsInstance)
+                {                    
                     var frm = new SearchWindow();
-                    instance.DataReceived += frm.AddFile;
-                    instance.Ready();
+                    Instance.DataReceived += frm.AddFile;
+                    Instance.Ready();
 
                     frm.AddFile(files);
 
@@ -124,10 +123,10 @@ namespace Kisbo
 
                         data = Encoding.UTF8.GetBytes(sb.ToString());
 
-                        instance.Send(data);
+                        Instance.Send(data);
                     }
                     else
-                        instance.Send(new byte[1] { 0 });
+                        Instance.Send(new byte[1] { 0 });
                 }
             }
 

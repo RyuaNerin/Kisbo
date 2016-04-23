@@ -112,19 +112,25 @@ namespace Kisbo.Utilities
 
         private bool SendData(byte[] data)
         {
-            using (var pipe = new NamedPipeClientStream(".", this.m_uniqueName, PipeDirection.Out))
+            try
             {
-                pipe.Connect(50);
-                if (!pipe.IsConnected)
-                    return false;
+                using (var pipe = new NamedPipeClientStream(".", this.m_uniqueName, PipeDirection.Out))
+                {
+                    pipe.Connect(50);
 
-                pipe.Write(data, 0, data.Length);
-                pipe.Flush();
-                
-                pipe.WaitForPipeDrain();
-                return true;
+                    pipe.Write(data, 0, data.Length);
+                    pipe.Flush();
 
+                    pipe.WaitForPipeDrain();
+                    return true;
+
+                }
             }
+            catch
+            {
+            }
+
+            return false;
         }
     }
 }

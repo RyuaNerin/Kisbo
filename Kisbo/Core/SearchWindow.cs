@@ -54,15 +54,18 @@ namespace Kisbo.Core
 
         private void SearchWindow_FormClosed(object sender, FormClosedEventArgs e)
         {
+            KisboMain.Instance.Release();
+
             this.ctlNotify.Visible = false;
             this.Hide();
             
             this.m_search.Set();
             this.m_pauseHandler.Set();
             this.m_newItemHandler.Set();
+            
             this.m_cancel.Cancel();
-            Task.WaitAll(this.m_workers);
-            Application.ExitThread();
+            Task.WaitAll(this.m_workers, 5000);
+
             Application.Exit();
         }
 
@@ -88,81 +91,77 @@ namespace Kisbo.Core
         }
         public void AddFile(IEnumerable<string> data)
         {
-            if (this.InvokeRequired)
+            try
             {
-                try
+                if (this.InvokeRequired)
                 {
-                    this.Invoke(new Action<IEnumerable<string>>(this.AddFile), data);	
+                    this.Invoke(new Action<IEnumerable<string>>(this.AddFile), data);
                 }
-                catch
+                else
                 {
-                }
-            }
-            else
-            {
-                this.ctlList.BeginUpdate();
+                    this.ctlList.BeginUpdate();
 
-                lock (this.m_lock)
-                {
-                    Debug.WriteLine("AddFile Lock");
-
-                    var lst = new List<string>();
-
-                    foreach (var path in data)
+                    lock (this.m_lock)
                     {
-                        if (KisboMain.Check(path) && !this.m_list.Exists(e => e.OriginalFilePath.Equals(path, StringComparison.OrdinalIgnoreCase)))
-                        {
-                            lst.Add(path);
-                        }
+                        Debug.WriteLine("AddFile Lock");
+
+                        var lst = new List<string>();
+
+                        foreach (var path in data)
+                            if (KisboMain.Check(path) && !this.m_list.Exists(e => e.OriginalFilePath.Equals(path, StringComparison.OrdinalIgnoreCase)))
+                                lst.Add(path);
+
+                        for (int i = 0; i < lst.Count; ++i)
+                            KisboFile.Create(this, lst[i]);
+
+                        if (lst.Count > 0)
+                            this.m_newItemHandler.Set();
+
+                        Interlocked.Add(ref this.m_taskbarMax, lst.Count);
+
+                        Debug.WriteLine("AddFile Unlock");
                     }
 
-                    for (int i = 0; i < lst.Count; ++i)
-                        KisboFile.Create(this, lst[i]);
+                    this.ctlList.EndUpdate();
 
-                    if (lst.Count > 0)
-                        this.m_newItemHandler.Set();
-
-                    Interlocked.Add(ref this.m_taskbarMax, lst.Count);
-
-                    Debug.WriteLine("AddFile Unlock");
+                    this.SetProgress();
                 }
-
-                this.ctlList.EndUpdate();
-
-                this.SetProgress();
+            }
+            catch
+            {
             }
         }
 
         public void SetProgress()
         {
-            if (this.InvokeRequired)
+            try
             {
-                try
+                if (this.InvokeRequired)
                 {
                     this.Invoke(new Action(this.SetProgress));
                 }
-                catch
+                else
                 {
+                    var val = Interlocked.Read(ref this.m_taskbarVal);
+                    var max = Interlocked.Read(ref this.m_taskbarMax);
+
+                    this.ctlProgress.Text = string.Format("{0} / {1}", val, max);
+
+                    if (val != max)
+                    {
+                        this.m_taskbar.SetProgressValue(this.Handle, (ulong)val + 1, (ulong)max + 1);
+
+                        if (this.m_pauseHandler.WaitOne(0))
+                            this.m_taskbar.SetProgressState(this.Handle, TBPFLAG.TBPF_NORMAL);
+                        else
+                            this.m_taskbar.SetProgressState(this.Handle, TBPFLAG.TBPF_PAUSED);
+                    }
+                    else
+                        this.m_taskbar.SetProgressState(this.Handle, TBPFLAG.TBPF_NOPROGRESS);
                 }
             }
-            else
+            catch
             {
-                var val = Interlocked.Read(ref this.m_taskbarVal);
-                var max = Interlocked.Read(ref this.m_taskbarMax);
-
-                this.ctlProgress.Text = string.Format("{0} / {1}", val, max);
-
-                if (val != max)
-                {
-                    this.m_taskbar.SetProgressValue(this.Handle, (ulong)val + 1, (ulong)max + 1);
-
-                    if (this.m_pauseHandler.WaitOne(0))
-                        this.m_taskbar.SetProgressState(this.Handle, TBPFLAG.TBPF_NORMAL);
-                    else
-                        this.m_taskbar.SetProgressState(this.Handle, TBPFLAG.TBPF_PAUSED);
-                }
-                else
-                    this.m_taskbar.SetProgressState(this.Handle, TBPFLAG.TBPF_NOPROGRESS);
             }
         }
 
@@ -176,19 +175,17 @@ namespace Kisbo.Core
         
         private DialogResult ShowMessageBox(string text, MessageBoxButtons buttons, MessageBoxIcon icon)
         {
-            if (this.InvokeRequired)
+            try
             {
-                try
-                {
+                if (this.InvokeRequired)
                     return (DialogResult)this.Invoke(new Func<string, MessageBoxButtons, MessageBoxIcon, DialogResult>(this.ShowMessageBox), text, buttons, icon);
-                }
-                catch
-                {
-                    return DialogResult.None;
-                }
+                else
+                    return MessageBox.Show(this, text, this.Text, buttons, icon);
             }
-            else
-                return MessageBox.Show(this, text, this.Text, buttons, icon);
+            catch
+            {
+                return DialogResult.None;
+            }
         }
 
         private void Search()
@@ -475,10 +472,10 @@ namespace Kisbo.Core
                         if (!Directory.Exists(dir))
                             Directory.CreateDirectory(dir);
 
-                        File.Move(file.OriginalFilePath, Path.Combine(dir, Path.GetFileName(file.OriginalFilePath)));
+                        File.Move(file.OriginalFilePath, GetSafeFileName(Path.Combine(dir, Path.GetFileName(file.OriginalFilePath))));
 
                         newPath = Path.ChangeExtension(file.OriginalFilePath, newExtension);
-                        File.Move(tempPath, GetSafeFileName(newPath, ""));
+                        File.Move(tempPath, GetSafeFileName(newPath));
 
                         file.NewFilePath = newPath;
 
@@ -507,19 +504,19 @@ namespace Kisbo.Core
             }
         }
 
-        private static string GetSafeFileName(string path, string part)
+        private static string GetSafeFileName(string path)
         {
             var dir  = Path.GetDirectoryName(path);
             var name = Path.GetFileNameWithoutExtension(path);
             var ext  = Path.GetExtension(path);
 
-            var newPath = Path.Combine(dir, string.Format("{0}{1}{2}", name, part, ext));
+            var newPath = Path.Combine(dir, string.Format("{0}{1}", name, ext));
             if (!File.Exists(newPath) && !Directory.Exists(newPath)) return newPath;
 
             int i = 0;
             do 
             {
-                newPath = Path.Combine(dir, string.Format("{0}{1} ({2}){3}", name, part, ++i, ext));
+                newPath = Path.Combine(dir, string.Format("{0} ({1}){2}", name, ++i, ext));
             } while (File.Exists(newPath) || Directory.Exists(newPath));
 
             return newPath;

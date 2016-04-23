@@ -21,7 +21,12 @@ namespace Kisbo.Utilities
             if (token.IsCancellationRequested) return false;
 
             if (!passException)
-                Monitor.Wait(string.Intern(uri.Host));
+            {
+                var host = string.Intern(uri.Host);
+
+                Monitor.Enter(host);
+                Monitor.Exit(host);
+            }
 
             if (token.IsCancellationRequested) return false;
 
@@ -57,7 +62,7 @@ namespace Kisbo.Utilities
                 string cookies;
                 using (res = e.Response as HttpWebResponse)
                 {
-                    if (res.Server.IndexOf("cloudflare", StringComparison.OrdinalIgnoreCase) == -1)
+                    if (res.Server != null && res.Server.IndexOf("cloudflare", StringComparison.OrdinalIgnoreCase) == -1)
                         return false;
 
                     using (var mem = new MemoryStream(10240))
