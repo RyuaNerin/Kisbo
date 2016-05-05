@@ -64,7 +64,13 @@ namespace Kisbo.Core
             this.m_newItemHandler.Set();
             
             this.m_cancel.Cancel();
-            Task.WaitAll(this.m_workers, 5000);
+            try
+            {
+                Task.WaitAll(this.m_workers, 5000);	
+            }
+            catch
+            {
+            }
 
             Application.Exit();
         }
@@ -342,24 +348,12 @@ namespace Kisbo.Core
                     // DELETE BOM
                     writer.BaseStream.SetLength(0);
                     writer.WriteLine(boundary);
-                    writer.WriteLine("Content-Disposition: form-data; name=\"image_url\"");
-                    writer.WriteLine();
-                    writer.WriteLine();
-                    writer.WriteLine(boundary);
-                    writer.WriteLine("Content-Disposition: form-data; name=\"encoded_image\"; filename=\"\"");
+                    writer.WriteLine("Content-Disposition: form-data; name=\"encoded_image\"; filename=\"{0}\"", info.Name);
                     writer.WriteLine("Content-Type: application/octet-stream");
                     writer.WriteLine();
-                    writer.WriteLine();
-                    writer.WriteLine(boundary);
-                    writer.WriteLine("Content-Disposition: form-data; name=\"image_content\"");
-                    writer.WriteLine();
                     using (var fileStream = info.OpenRead())
-                        Base64Stream.WriteTo(fileStream, writer.BaseStream, token);
+                        fileStream.CopyTo(writer.BaseStream, 4096);
                     writer.WriteLine();
-                    writer.WriteLine(boundary);
-                    writer.WriteLine("Content-Disposition: form-data; name=\"filename\"");
-                    writer.WriteLine();
-                    writer.WriteLine(info.Name);
                     writer.WriteLine(boundary + "--");
 
                     writer.BaseStream.Position = 0;
@@ -524,6 +518,20 @@ namespace Kisbo.Core
         #endregion
 
         #region 메뉴
+        private void ctlList_KeyUp(object sender, KeyEventArgs e)
+        {
+            if (e.Control && e.KeyCode == Keys.A)
+            {
+                lock (this.m_lock)
+                {
+                    Debug.WriteLine("ctlList_KeyUp Lock");
+                    for (int i = 0; i < this.ctlList.Items.Count; ++i)
+                        this.ctlList.Items[i].Selected = true;
+                    Debug.WriteLine("ctlList_KeyUp Unlock");
+                }
+            }
+        }
+
         private void ctlPause_Click(object sender, EventArgs e)
         {
             if (this.m_pauseHandler.WaitOne(0))
@@ -796,6 +804,9 @@ namespace Kisbo.Core
 
                 if (!GetFiles(lst, this.ctlOpenDir.SelectedPath))
                     ShowMessageBox("파일 수가 너무 많습니다!\n한번에 100개 이하씩 추가해주세요", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+                if (lst.Count > 0)
+                    this.AddFile(lst.ToArray());
             }
         }
 
@@ -805,7 +816,7 @@ namespace Kisbo.Core
             string[] paths;
 
             paths = Directory.GetFiles(path);
-            for (i = 0; i < path.Length; ++i)
+            for (i = 0; i < paths.Length; ++i)
             {
                 if (KisboMain.Check(paths[i]))
                 {
@@ -822,6 +833,9 @@ namespace Kisbo.Core
                 // contains subitem
                 if (!containsSubdir.HasValue && Directory.GetDirectories(this.ctlOpenDir.SelectedPath).Length > 0)
                     containsSubdir = ShowMessageBox("하위 폴더들도 추가할까요?", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
+
+                if (!containsSubdir.Value)
+                    return true;
 
                 for (i = 0; i < path.Length; ++i)
                     if (!GetFiles(lst, paths[i], containsSubdir))
@@ -948,5 +962,6 @@ namespace Kisbo.Core
             Application.Exit();
         }
         #endregion
+
     }
 }

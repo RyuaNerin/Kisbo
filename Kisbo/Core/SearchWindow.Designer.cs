@@ -42,6 +42,7 @@
             this.ctlListState = new System.Windows.Forms.ImageList(this.components);
             this.ctlOpenFile = new System.Windows.Forms.OpenFileDialog();
             this.ctlMenu = new System.Windows.Forms.MenuStrip();
+            this.ctlExit0 = new System.Windows.Forms.ToolStripMenuItem();
             this.ctlPause = new System.Windows.Forms.ToolStripMenuItem();
             this.ctlAdd = new System.Windows.Forms.ToolStripMenuItem();
             this.ctlAddFile = new System.Windows.Forms.ToolStripMenuItem();
@@ -63,7 +64,6 @@
             this.ctlNofityMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.ctlExit = new System.Windows.Forms.ToolStripMenuItem();
             this.ttp = new System.Windows.Forms.ToolTip(this.components);
-            this.ctlExit0 = new System.Windows.Forms.ToolStripMenuItem();
             this.ctlListMenu.SuspendLayout();
             this.ctlMenu.SuspendLayout();
             this.ctlNofityMenu.SuspendLayout();
@@ -93,6 +93,7 @@
             this.ctlList.View = System.Windows.Forms.View.Details;
             this.ctlList.DragDrop += new System.Windows.Forms.DragEventHandler(this.ctlList_DragDrop);
             this.ctlList.DragEnter += new System.Windows.Forms.DragEventHandler(this.ctlList_DragEnter);
+            this.ctlList.KeyUp += new System.Windows.Forms.KeyEventHandler(this.ctlList_KeyUp);
             this.ctlList.MouseDoubleClick += new System.Windows.Forms.MouseEventHandler(this.ctlList_MouseDoubleClick);
             // 
             // ctlList0
@@ -166,7 +167,7 @@
             // 
             // ctlOpenFile
             // 
-            this.ctlOpenFile.Filter = "|이미지 파일|*.bmp;*.jpg;*.jpeg;*.png;*.gif|";
+            this.ctlOpenFile.Filter = "이미지 파일|*.bmp;*.jpg;*.jpeg;*.png;*.gif";
             // 
             // ctlMenu
             // 
@@ -182,6 +183,13 @@
             this.ctlMenu.Size = new System.Drawing.Size(320, 24);
             this.ctlMenu.TabIndex = 1;
             this.ctlMenu.Text = "menuStrip1";
+            // 
+            // ctlExit0
+            // 
+            this.ctlExit0.Name = "ctlExit0";
+            this.ctlExit0.Size = new System.Drawing.Size(43, 20);
+            this.ctlExit0.Text = "종료";
+            this.ctlExit0.Click += new System.EventHandler(this.ctlExit_Click);
             // 
             // ctlPause
             // 
@@ -204,16 +212,18 @@
             // ctlAddFile
             // 
             this.ctlAddFile.Name = "ctlAddFile";
-            this.ctlAddFile.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.A)));
-            this.ctlAddFile.Size = new System.Drawing.Size(160, 22);
+            this.ctlAddFile.ShortcutKeys = ((System.Windows.Forms.Keys)(((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.Shift) 
+            | System.Windows.Forms.Keys.A)));
+            this.ctlAddFile.Size = new System.Drawing.Size(193, 22);
             this.ctlAddFile.Text = "파일";
             this.ctlAddFile.Click += new System.EventHandler(this.ctlAddFile_Click);
             // 
             // ctlAddDir
             // 
             this.ctlAddDir.Name = "ctlAddDir";
-            this.ctlAddDir.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Alt | System.Windows.Forms.Keys.A)));
-            this.ctlAddDir.Size = new System.Drawing.Size(160, 22);
+            this.ctlAddDir.ShortcutKeys = ((System.Windows.Forms.Keys)(((System.Windows.Forms.Keys.Alt | System.Windows.Forms.Keys.Shift) 
+            | System.Windows.Forms.Keys.A)));
+            this.ctlAddDir.Size = new System.Drawing.Size(193, 22);
             this.ctlAddDir.Text = "디렉토리";
             this.ctlAddDir.Click += new System.EventHandler(this.ctlAddDir_Click);
             // 
@@ -343,13 +353,6 @@
             this.ctlExit.Size = new System.Drawing.Size(98, 22);
             this.ctlExit.Text = "종료";
             this.ctlExit.Click += new System.EventHandler(this.ctlExit_Click);
-            // 
-            // ctlExit0
-            // 
-            this.ctlExit0.Name = "ctlExit0";
-            this.ctlExit0.Size = new System.Drawing.Size(43, 20);
-            this.ctlExit0.Text = "종료";
-            this.ctlExit0.Click += new System.EventHandler(this.ctlExit_Click);
             // 
             // SearchWindow
             // 

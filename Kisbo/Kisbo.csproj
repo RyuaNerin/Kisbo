@@ -92,7 +92,6 @@
     </Compile>
     <Compile Include="LastRelease.cs" />
     <Compile Include="ShellExtension.cs" />
-    <Compile Include="Utilities\Base64Stream.cs" />
     <Compile Include="Utilities\ExplorerHelper.cs" />
     <Compile Include="Utilities\BypassHttp.cs" />
     <Compile Include="Utilities\InstanceHelperEx.cs" />
