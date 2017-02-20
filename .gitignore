@@ -85,6 +85,7 @@ ipch/
 *.vsp
 *.vspx
 *.sap
+*.VC.db
 
 # TFS 2012 Local Workspace
 $tf/
@@ -234,3 +235,4 @@ _Pvt_Extensions
 
 # FAKE - F# Make
 .fake/
+Kisbo.VC.db
