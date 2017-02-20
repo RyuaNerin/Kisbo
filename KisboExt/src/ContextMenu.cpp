@@ -1,4 +1,4 @@
-﻿#include "stdafx.h"
+#include "stdafx.h"
 #include "ContextMenu.h"
 
 #include <Shellapi.h>

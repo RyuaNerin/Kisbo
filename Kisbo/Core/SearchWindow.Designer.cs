@@ -1,4 +1,4 @@
-﻿namespace Kisbo.Core
+namespace Kisbo.Core
 {
     partial class SearchWindow
     {

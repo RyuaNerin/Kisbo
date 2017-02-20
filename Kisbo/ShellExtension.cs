@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Windows.Forms;
@@ -72,10 +72,17 @@ namespace Kisbo
                 startup.Arguments = "--install";
                 startup.Verb = "runas";
 
-                using (var proc = Process.Start(startup))
+                try
                 {
-                    proc.WaitForExit();
-                    return (Result)proc.ExitCode;
+                    using (var proc = Process.Start(startup))
+                    {
+                        proc.WaitForExit();
+                        return (Result)proc.ExitCode;
+                    }
+                }
+                catch(SystemException)
+                {
+                    return Result.NOT_AUTHORIZED;
                 }
             }
         }
@@ -85,6 +92,7 @@ namespace Kisbo
             startup.WindowStyle = ProcessWindowStyle.Hidden;
             startup.UseShellExecute = true;
             startup.WorkingDirectory = Environment.CurrentDirectory;
+     
 
             if (KisboMain.IsAdministratorMode)
             {
@@ -94,15 +102,14 @@ namespace Kisbo
 
                 startup.FileName = "regsvr32";
                 startup.Arguments = string.Format("/s /u \"{0}\"", dllPath);
+                
 
-                Result r;
                 using (var proc = Process.Start(startup))
                 {
                     proc.WaitForExit();
-                    r =  proc.ExitCode == 0 ? Result.NO_ERROR : Result.FAIL_REG;
+                    return proc.ExitCode == 0 ? Result.NO_ERROR : Result.FAIL_REG;
                 }
-
-                return r;
+      
             }
             else if (runas)
             {
@@ -112,13 +119,20 @@ namespace Kisbo
             else
             {
                 startup.FileName = Application.ExecutablePath;
-                startup.Arguments = "--unisntall";
+                startup.Arguments = "--uninstall";
                 startup.Verb = "runas";
 
-                using (var proc = Process.Start(startup))
+                try
                 {
-                    proc.WaitForExit();
-                    return (Result)proc.ExitCode;
+                    using (var proc = Process.Start(startup))
+                    {
+                        proc.WaitForExit();
+                        return (Result)proc.ExitCode;
+                    }
+                }
+                catch (SystemException)
+                {
+                    return Result.NOT_AUTHORIZED;
                 }
             }
         }
