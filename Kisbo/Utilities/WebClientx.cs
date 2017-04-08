@@ -33,20 +33,24 @@ namespace Kisbo.Utilities
 
         public string DownloadString(Uri uri)
         {
-            if (!Request(uri, null, null))
+            if (!Request(uri, this.m_buffer, null, null))
                 return null;
 
             return m_reader.ReadToEnd();
+        }
+        public bool DownloadData(Uri uri, Stream stream)
+        {
+            return Request(uri, stream, null, null);
         }
         public string UploadData(Uri uri, Stream data, string contentType)
         {
-            if (!Request(uri, data, contentType))
+            if (!Request(uri, this.m_buffer, data, contentType))
                 return null;
 
             return m_reader.ReadToEnd();
         }
 
-        private bool Request(Uri uri, Stream data, string contentType)
+        private bool Request(Uri uri, Stream buffer, Stream data, string contentType)
         {
             this.m_buffer.SetLength(0);
 
@@ -87,14 +91,14 @@ namespace Kisbo.Utilities
                     using (stream = res.GetResponseStream())
                     {
                         while (!this.m_token.IsCancellationRequested && (read = stream.Read(buff, 0, 4096)) > 0)
-                            this.m_buffer.Write(buff, 0, read);
+                            buffer.Write(buff, 0, read);
 
                         if (this.m_token.IsCancellationRequested)
                             return false;
                     }
                 }
 
-                this.m_buffer.Position = 0;
+                buffer.Position = 0;
                 return true;
             }
             catch (WebException e)

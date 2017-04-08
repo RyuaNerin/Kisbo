@@ -12,6 +12,8 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using Kisbo.Utilities;
 using WinTaskbar;
+using HtmlAgilityPack;
+using HtmlDocument = HtmlAgilityPack.HtmlDocument;
 
 namespace Kisbo.Core
 {
@@ -320,7 +322,6 @@ namespace Kisbo.Core
             }
         }
         
-        private static Regex regSimilar = new Regex("<a href=\"([^\"]+)\">", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private States SearchImage(WebClientx wc, KisboFile file, StreamWriter writer, CancellationToken token)
         {
             string body;
@@ -401,38 +402,47 @@ namespace Kisbo.Core
                 }
 
                 file.GoogleUrl = wc.ResponseUri.AbsoluteUri;
+                
+                var html = new HtmlDocument();
+                html.LoadHtml(body);
+                var docNode = html.DocumentNode;
 
-                int startIndex = body.IndexOf("<div class=\"card-section\">", StringComparison.OrdinalIgnoreCase);
-                int endIndex   = body.IndexOf("<hr class=\"rgsep _l4\">", startIndex, StringComparison.OrdinalIgnoreCase);
+                bool succ = false;
+                foreach (var card_section_node in docNode.SelectNodes(@"//div[contains(@class,'card-section')]"))
+                {
+                    foreach (var a_node in card_section_node.SelectNodes(".//a"))
+                    {
+                        var href = a_node.Attributes["href"];
+                        if (href == null)
+                            continue;
 
-                var m = regSimilar.Match(body, startIndex, endIndex - startIndex);
+                        if ((body = wc.DownloadString(new Uri(this.m_googleUri, href.Value.Replace("&amp;", "&")))) == null)
+                            return States.Error;
 
-                if (!m.Success)
+                        html.LoadHtml(body);
+                        docNode = html.DocumentNode;
+
+                        succ = true;
+                        break;
+                    }
+                }
+                
+                if (!succ)
                     return States.NoResult;
 
-                if ((body = wc.DownloadString(new Uri(this.m_googleUri, m.Groups[1].Value.Replace("&amp;", "&")))) == null)
-                    return States.Error;
-
-                string part, newExtension = null, newPath, tempPath = null, dir;
+                string newExtension = null, newPath, tempPath = null, dir;
                 Guid guid;
                 RGMeta rgMeta;
 
-                startIndex = 0;
-                while ((startIndex = body.IndexOf("<div class=\"rg_meta\">", startIndex, StringComparison.OrdinalIgnoreCase)) >= 0)
+                foreach (var rg_meta_node in docNode.SelectNodes(@"//div[contains(@class,'rg_meta')]"))
                 {
                     if (file.Removed) break;
 
                     if (token.IsCancellationRequested) return States.Error;
 
-                    startIndex = body.IndexOf("{", startIndex + 1, StringComparison.OrdinalIgnoreCase);
-                    endIndex = body.IndexOf("</div>", startIndex, StringComparison.OrdinalIgnoreCase);
-                    part = body.Substring(startIndex, endIndex - startIndex);
-
-                    startIndex = endIndex + 1;
-
                     try
                     {
-                        rgMeta = RGMeta.Parse(part);
+                        rgMeta = RGMeta.Parse(rg_meta_node.InnerHtml);
                         if (rgMeta.Width  <= oldSize.Width ||
                             rgMeta.Height <= oldSize.Height)
                             continue;
@@ -440,8 +450,11 @@ namespace Kisbo.Core
                         tempPath = Path.GetTempFileName();
 
                         using (var fileStream = File.OpenWrite(tempPath))
-                            if (!BypassHttp.GetResponse(rgMeta.ImageUrl, fileStream, token))
+                        {
+                            fileStream.SetLength(0);
+                            if (!wc.DownloadData(rgMeta.ImageUrl, fileStream))
                                 continue;
+                        }
 
                         if (file.Removed) break;
                         using (var img = Image.FromFile(tempPath))
@@ -730,6 +743,8 @@ namespace Kisbo.Core
                         Interlocked.Increment(ref this.m_taskbarMax);
                     }
                 }
+
+                this.m_newItemHandler.Set();
 
                 this.SetProgress();
 
