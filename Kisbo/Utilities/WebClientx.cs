@@ -31,26 +31,26 @@ namespace Kisbo.Utilities
 
         public Uri ResponseUri { get; private set; }
 
-        public string DownloadString(Uri uri)
+        public string DownloadString(Uri uri, string referer = null)
         {
-            if (!Request(uri, this.m_buffer, null, null))
+            if (!Request(uri, this.m_buffer, null, null, referer))
                 return null;
 
             return m_reader.ReadToEnd();
         }
-        public bool DownloadData(Uri uri, Stream stream)
+        public bool DownloadData(Uri uri, Stream stream, string referer = null)
         {
-            return Request(uri, stream, null, null);
+            return Request(uri, stream, null, null, referer);
         }
-        public string UploadData(Uri uri, Stream data, string contentType)
+        public string UploadData(Uri uri, Stream data, string contentType, string referer = null)
         {
-            if (!Request(uri, this.m_buffer, data, contentType))
+            if (!Request(uri, this.m_buffer, data, contentType, referer))
                 return null;
 
             return m_reader.ReadToEnd();
         }
 
-        private bool Request(Uri uri, Stream buffer, Stream data, string contentType)
+        private bool Request(Uri uri, Stream buffer, Stream data, string contentType, string referer)
         {
             this.m_buffer.SetLength(0);
 
@@ -59,7 +59,9 @@ namespace Kisbo.Utilities
             req.UserAgent = UserAgent;
             req.AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip;
 
-            if (this.ResponseUri != null)
+            if (referer != null)
+                req.Referer = referer;
+            else if (this.ResponseUri != null)
                 req.Referer = this.ResponseUri.AbsoluteUri;
 
             Stream stream;

@@ -416,6 +416,9 @@ namespace Kisbo.Core
                         if (href == null)
                             continue;
 
+                        if (href.Value.IndexOf("tbs=") == -1)
+                            continue;
+
                         if ((body = wc.DownloadString(new Uri(this.m_googleUri, href.Value.Replace("&amp;", "&")))) == null)
                             return States.Error;
 
@@ -452,7 +455,7 @@ namespace Kisbo.Core
                         using (var fileStream = File.OpenWrite(tempPath))
                         {
                             fileStream.SetLength(0);
-                            if (!wc.DownloadData(rgMeta.ImageUrl, fileStream))
+                            if (!wc.DownloadData(rgMeta.ImageUrl, fileStream, rgMeta.ImageUrl.AbsoluteUri))
                                 continue;
                         }
 
