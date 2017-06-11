@@ -20,6 +20,7 @@ x86/
 bld/
 [Bb]in/
 [Oo]bj/
+Kisbo/KisboExt/
 
 # Visual Studio 2015 cache/options directory
 .vs/
@@ -79,6 +80,7 @@ ipch/
 *.opensdf
 *.sdf
 *.cachefile
+*.VC.db
 
 # Visual Studio profiler
 *.psess

@@ -10,6 +10,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Collections;
 using Kisbo.Utilities;
 using WinTaskbar;
 using HtmlAgilityPack;
@@ -937,9 +938,21 @@ namespace Kisbo.Core
         {
             if (this.ShowMessageBox(str + "\n탐색기를 재시작 할까요?", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
+                ArrayList preURLs = new ArrayList();
                 //taskkill /IM explorer.exe /F & explorer.exe
+
+                SHDocVw.ShellWindows shellWindows = new SHDocVw.ShellWindows();
+                foreach (SHDocVw.InternetExplorer ie in shellWindows)
+                {
+                    if (Path.GetFileNameWithoutExtension(ie.FullName).ToLower().Equals("explorer"))
+                        preURLs.Add(new Uri(ie.LocationURL).LocalPath);
+                }
+				
                 using (var proc = Process.Start(new ProcessStartInfo { Arguments = "/IM explorer.exe /F", FileName = "taskkill", WindowStyle = ProcessWindowStyle.Hidden, UseShellExecute = true }))
                     proc.WaitForExit();
+
+                foreach (String url in preURLs)
+                    Process.Start("explorer.exe", url).Dispose();
 
                 Process.Start("explorer.exe").Dispose();
             }
