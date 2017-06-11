@@ -17,7 +17,7 @@ namespace Kisbo
         private const string KISBO_MUTEX_NAME = "5088D54F-99E9-4C3B-B780-837FD12FF3A6";
         
         public static readonly int RevNumber;
-        public static readonly bool IsAdministratorMode;        
+        public static readonly bool IsAdministratorMode;
 
         static KisboMain()
         {
