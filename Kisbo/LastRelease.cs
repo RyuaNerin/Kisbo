@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Net;
 using System.Runtime.Serialization;
@@ -36,6 +36,9 @@ namespace Kisbo
         }
         public static LastestRealease CheckNewVersion()
         {
+            if (Application.ProductVersion == "0.0.0.0")
+                return null;
+
             try
             {
                 LastestRealease last;
