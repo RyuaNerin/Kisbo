@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
@@ -7,39 +7,18 @@ namespace Kisbo.Core
 {
     internal enum States
     {
-        /// <summary>
-        /// 대기중
-        /// </summary>
-        Wait = 0,
-        /// <summary>
-        /// 작업중
-        /// </summary>
-        Working = 1,
-        /// <summary>
-        /// 잠시후 다시 검색해주세요
-        /// </summary>
-        WaitSearch = 2,
-        /// <summary>
-        /// 성공
-        /// </summary>
-        Complete = 3,
-        /// <summary>
-        /// 스킵
-        /// </summary>
-        Pass = 4,
-        /// <summary>
-        /// 검색결과 없음
-        /// </summary>
-        NoResult = 5,
-        /// <summary>
-        /// 에러
-        /// </summary>
-        Error = 6,
+        Wait       = 0, // 대기중
+        Working    = 1, // 작업중
+        WaitSearch = 2, // 잠시후 다시 검색해주세요
+        Complete   = 3, // 성공
+        Pass       = 4, // 스킵
+        NoResult   = 5, // 검색결과 없음
+        Error      = 6, // 에러
     }
 
     internal class KisboFile
     {
-        private KisboFile(SearchWindow form, string filePath)
+        public KisboFile(SearchWindow form, string filePath)
         {
             this.m_form = form;
             this.m_fileName = filePath;
@@ -49,31 +28,6 @@ namespace Kisbo.Core
             this.ListViewItem.StateImageIndex = 0;
             this.ListViewItem.SubItems.Add("");
             this.ListViewItem.SubItems.Add("");
-        }
-
-        public static void Create(SearchWindow form, string filePath)
-        {
-            var kisboFile = new KisboFile(form, filePath);
-
-            form.ctlList.Items.Add(kisboFile.ListViewItem);
-            form.m_list.Add(kisboFile);
-        }
-
-        public void Remove()
-        {
-            this.Removed = true;
-
-            this.m_form.ctlList.Items.RemoveAt(this.ListViewItem.Index);
-            
-            this.m_form.m_list.Remove(this);
-
-            if (!this.NotTodo)
-            {
-                this.m_form.DecrementTaskbar(true);
-
-                if (this.Worked)
-                    this.m_form.DecrementTaskbar(false);
-            }
         }
 
         public void Clear()
@@ -90,10 +44,10 @@ namespace Kisbo.Core
         public readonly ListViewItem ListViewItem;
 
         public readonly string m_fileName;
-        public string OriginalFilePath { get { return this.m_fileName; } }
+        public string OriginalFilePath => this.m_fileName;
         public string NewFilePath { get; set; }
-        public string FilePath { get { return this.NewFilePath == null ? this.m_fileName : this.NewFilePath; } }
-        
+        public string FilePath => this.NewFilePath ?? this.m_fileName;
+
         private bool m_removed;
         public bool Removed
         {
@@ -114,21 +68,25 @@ namespace Kisbo.Core
         public States State
         {
             get { lock (this.m_lock) return this.m_state; }
-            set { lock (this.m_lock) this.m_state = value; }
+            set
+            {
+                lock (this.m_lock)
+                {
+                    this.m_state = value;
+
+                    this.m_form.Invoke(new Action(() => this.ListViewItem.StateImageIndex = (int)value));
+                }
+            }
         }
         public bool Working { get { lock (this.m_lock) return this.m_state == States.Working  || this.m_state == States.WaitSearch; } }
         public bool Worked  { get { lock (this.m_lock) return this.m_state != States.Wait     && this.m_state != States.Working && this.m_state != States.WaitSearch; } }
         public bool Success { get { lock (this.m_lock) return this.m_state == States.Complete || this.m_state == States.Pass    || this.m_state == States.NoResult; } }
 
-        public void SetStatus()
-        {
-            this.m_form.Invoke(new Action(() => this.ListViewItem.StateImageIndex = (int)this.State));
-        }
-        public void SetBeforeResolution(Size value)
+        public void UpdateBeforeResolution(Size value)
         {
             this.m_form.Invoke(new Action(() => this.ListViewItem.SubItems[1].Text = string.Format("{0}x{1}", value.Width, value.Height)));
         }
-        public void SetAfterResolution(Size value)
+        public void UpdateAfterResolution(Size value)
         {
             this.m_form.Invoke(new Action(() => this.ListViewItem.SubItems[2].Text = string.Format("{0}x{1}", value.Width, value.Height)));
         }
