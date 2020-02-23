@@ -72,10 +72,17 @@ namespace Kisbo
                 startup.Arguments = "--install";
                 startup.Verb = "runas";
 
-                using (var proc = Process.Start(startup))
+                try
                 {
-                    proc.WaitForExit();
-                    return (Result)proc.ExitCode;
+                    using (var proc = Process.Start(startup))
+                    {
+                        proc.WaitForExit();
+                        return (Result)proc.ExitCode;
+                    }
+                }
+                catch(SystemException)
+                {
+                    return Result.NOT_AUTHORIZED;
                 }
             }
         }
@@ -112,13 +119,20 @@ namespace Kisbo
             else
             {
                 startup.FileName = Application.ExecutablePath;
-                startup.Arguments = "--unisntall";
+                startup.Arguments = "--uninstall";
                 startup.Verb = "runas";
 
-                using (var proc = Process.Start(startup))
+                try
                 {
-                    proc.WaitForExit();
-                    return (Result)proc.ExitCode;
+                    using (var proc = Process.Start(startup))
+                    {
+                        proc.WaitForExit();
+                        return (Result)proc.ExitCode;
+                    }
+                }
+                catch (SystemException)
+                {
+                    return Result.NOT_AUTHORIZED;
                 }
             }
         }
