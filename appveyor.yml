@@ -21,7 +21,7 @@ before_build:
 - cmd: nuget restore
 
 artifacts:
--  path: Kisbo\bin\Release\Kisbo.exe
+-  path: bin\Release\Kisbo.exe
    name: executable
 
 deploy:
