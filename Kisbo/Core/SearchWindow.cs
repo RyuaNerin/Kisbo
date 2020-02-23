@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -9,8 +10,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Collections;
 using Kisbo.Utilities;
+using Newtonsoft.Json.Linq;
 using WinTaskbar;
 using HtmlDocument = HtmlAgilityPack.HtmlDocument;
 
@@ -400,43 +401,143 @@ namespace Kisbo.Core
                     } while (body == null);
                 }
 
-                file.GoogleUrl = wc.ResponseUri.AbsoluteUri;
+                var baseUri = wc.ResponseUri;
+                file.GoogleUrl = baseUri.AbsoluteUri;
                 
                 var html = new HtmlDocument();
                 html.LoadHtml(body);
                 var docNode = html.DocumentNode;
 
                 bool succ = false;
-                foreach (var card_section_node in docNode.SelectNodes(@"//div[contains(@class,'card-section')]"))
+                foreach (var a_gl in docNode.SelectNodes(@"//span[@class='gl']//a"))
                 {
-                    foreach (var a_node in card_section_node.SelectNodes(".//a"))
-                    {
-                        var href = a_node.Attributes["href"];
-                        if (href == null)
-                            continue;
+                    var href = a_gl.GetAttributeValue("href", null)?.Replace("&amp;", "&");
+                    if (href == null)
+                        continue;
 
-                        if (href.Value.IndexOf("tbs=") == -1)
-                            continue;
+                    if (!href.Contains("tbs=") || href.Contains(",isz"))
+                        continue;
 
-                        if ((body = wc.DownloadString(new Uri(this.m_googleUri, href.Value.Replace("&amp;", "&")))) == null)
-                            return States.Error;
+                    var u = new Uri(this.m_googleUri, href);
+                    if ((body = wc.DownloadString(u, baseUri.AbsoluteUri)) == null)
+                        return States.Error;
+                    baseUri = u;
 
-                        html.LoadHtml(body);
-                        docNode = html.DocumentNode;
+                    html.LoadHtml(body);
+                    docNode = html.DocumentNode;
 
-                        succ = true;
-                        break;
-                    }
+                    succ = true;
+                    break;
                 }
                 
                 if (!succ)
                     return States.NoResult;
 
+                var afDataList = new List<AfData>();
+
+                foreach (var scriptNode in docNode.SelectNodes("//*[name()='script']"))
+                {
+                    var script = scriptNode.InnerText;
+
+                    // find ds:2
+                    if (!script.Contains("AF_initDataCallback") | !script.Contains("'ds:2'"))
+                        continue;
+
+                    try
+                    {
+                        var sb = new StringBuilder();
+                        var pos = 0;
+                        var stack = 0;
+                        var escape = false;
+                        var isString = false;
+                        while (pos < script.Length)
+                        {
+                            pos = script.IndexOf("[1,[0,", pos);
+                            if (pos == -1)
+                                break;
+
+                            sb.Clear();
+                            sb.Append("[1,[0,");
+                            pos += sb.Length;
+                            stack = 2;
+
+                            while (pos < script.Length)
+                            {
+                                var c = script[pos];
+
+                                sb.Append(c);
+
+                                if (escape)
+                                {
+                                    escape = false;
+                                }
+                                else
+                                {
+                                    switch (c)
+                                    {
+                                        case '[':
+                                            if (!isString)
+                                                stack++;
+                                            break;
+
+                                        case ']':
+                                            if (!isString)
+                                                stack--;
+                                            break;
+
+                                        case '\\':
+                                            escape = true;
+                                            break;
+
+                                        case '"':
+                                            isString = !isString;
+                                            break;
+                                    }
+                                }
+
+                                pos++;
+
+                                if (stack == 0)
+                                {
+                                    try
+                                    {
+                                        Console.WriteLine(sb.ToString());
+                                        var ja = JArray.Parse(sb.ToString());
+
+                                        afDataList.Add(new AfData
+                                        {
+                                            ImageUri = new Uri(ja[1][3][0].Value<string>()),
+                                            Referer = ja[1][9]["2003"][2].Value<string>(),
+                                            Width = ja[1][3][1].Value<int>(),
+                                            Height = ja[1][3][2].Value<int>(),
+                                        });
+                                    }
+                                    catch
+                                    {
+                                    }
+
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (afDataList.Count > 0)
+                            break;
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                if (afDataList.Count == 0)
+                    return States.Error;
+
+                afDataList.Sort((a, b) => (a.Width * (long)a.Height).CompareTo(b.Width * (long)b.Height) * -1);
+
                 string newExtension = null, newPath, tempPath = null, dir;
                 Guid guid;
-                RGMeta rgMeta;
 
-                foreach (var rg_meta_node in docNode.SelectNodes(@"//div[contains(@class,'rg_meta')]"))
+                foreach (var afData in afDataList)
                 {
                     if (file.Removed) break;
 
@@ -444,9 +545,8 @@ namespace Kisbo.Core
 
                     try
                     {
-                        rgMeta = RGMeta.Parse(rg_meta_node.InnerHtml);
-                        if (rgMeta.Width  <= oldSize.Width ||
-                            rgMeta.Height <= oldSize.Height)
+                        if (afData.Width  <= oldSize.Width ||
+                            afData.Height <= oldSize.Height)
                             continue;
 
                         tempPath = Path.GetTempFileName();
@@ -454,7 +554,7 @@ namespace Kisbo.Core
                         using (var fileStream = File.OpenWrite(tempPath))
                         {
                             fileStream.SetLength(0);
-                            if (!wc.DownloadData(rgMeta.ImageUrl, fileStream, rgMeta.ImageUrl.AbsoluteUri))
+                            if (!wc.DownloadData(afData.ImageUri, fileStream, afData.Referer))
                                 continue;
                         }
 
