@@ -13,6 +13,7 @@ using System.Windows.Forms;
 using Kisbo.Utilities;
 using Newtonsoft.Json.Linq;
 using WinTaskbar;
+
 using HtmlDocument = HtmlAgilityPack.HtmlDocument;
 
 namespace Kisbo.Core
@@ -446,7 +447,7 @@ namespace Kisbo.Core
                     var script = scriptNode.InnerText;
 
                     // find ds:2
-                    if (!script.Contains("AF_initDataCallback") | !script.Contains("'ds:2'"))
+                    if (!script.Contains("AF_initDataCallback"))
                         continue;
 
                     try
